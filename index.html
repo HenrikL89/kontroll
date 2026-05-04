@@ -16,7 +16,6 @@
         #drop-zone { border: 3px dashed #ccc; padding: 60px; border-radius: 10px; cursor: pointer; text-align: center; background: #fafafa; transition: 0.2s; position: relative; }
         #drop-zone.hover { border-color: var(--nc-blue); background: #eef4ff; }
         
-        /* Laste-animasjon */
         .loader-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); border-radius: 10px; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--nc-blue); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 10px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -56,7 +55,7 @@
             <b id="loader-text">Analyserer filstruktur...</b>
         </div>
         <p id="drop-instruction" style="font-size: 1.3em; color: #444;">Dra og slipp IFC-fil her for kontroll</p>
-        <p style="color: #888;">Støtter flere revisjoner og objektkoder i samme fil.</p>
+        <p style="color: #888;">Støtter flere revisjoner, objektkoder og PNS-validering.</p>
         <input type="file" id="file-input" accept=".ifc" style="display: none;">
     </div>
 
@@ -104,7 +103,6 @@
     function handleFile(file) {
         if (!file) return;
 
-        // Reset UI og vis laster
         resultCard.style.display = 'none';
         loader.style.display = 'flex';
         loaderText.innerText = "Leser " + file.name + "...";
@@ -112,11 +110,10 @@
         const reader = new FileReader();
         reader.onload = (e) => {
             const content = e.target.result;
-            // Bruk setTimeout for å la browseren vise laster-animasjonen før tung Regex starter
             setTimeout(() => {
                 analyserTekst(content, file.name);
                 loader.style.display = 'none';
-                fileInput.value = ""; // Nullstill input slik at samme fil kan velges på nytt
+                fileInput.value = ""; 
             }, 100);
         };
         reader.readAsText(file);
@@ -148,8 +145,11 @@
         body.innerHTML = "";
         
         let feilAntall = 0;
-        const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
-        const objektkodeRegex = /^\d{8}$/; // 8 siffer
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/; 
+        const objektkodeRegex = /^\d{8}$/; 
+        
+        // Godkjente koder for PNS
+        const godkjentePNS = ["DSS", "FBX", "GTS", "HTØ", "VLG", "FEL", "DNS"];
 
         KRAV.forEach(k => {
             const verdier = Array.from(funn[k]);
@@ -157,8 +157,7 @@
             let infoHTML = "";
             let isError = false;
 
-            // Definerer hvilke felt som tillater flere ulike verdier (Multi-fields)
-            const allowMultiple = ["Objektkode V770", "Kontrollert av", "Revisjon", "Revisjonsdato"];
+            const allowMultiple = ["Objektkode V770", "Kontrollert av", "Revisjon", "Revisjonsdato", "PNS"];
 
             if (verdier.length === 0) {
                 statusHTML = `<span class="fail">MANGLER</span>`;
@@ -166,13 +165,11 @@
                 isError = true;
             } 
             else if (verdier.length > 1 && !allowMultiple.includes(k)) {
-                // Disse feltene må være like på alle objekter (f.eks. Prosjektnavn)
                 statusHTML = `<span class="fail">INKONSISTENT</span>`;
                 infoHTML = `Funnet flere ulike verdier: ${verdier.join(", ")}. Må være identisk på alle objekter.`;
                 isError = true;
             } 
             else {
-                // Sjekker spesifikke formater
                 if (k === "Godkjent av") {
                     if (verdier[0] !== "ThSel") {
                         statusHTML = `<span class="fail">FEIL VERDI: ${verdier[0]}</span>`;
@@ -204,13 +201,24 @@
                         infoHTML = `Alle koder er gyldige: ${verdier.join(", ")}`;
                     }
                 }
+                else if (k === "PNS") {
+                    // Sjekker at hver PNS-verdi inneholder minst én av de godkjente kodene
+                    const ugyldigePNS = verdier.filter(v => !godkjentePNS.some(kode => v.toUpperCase().includes(kode)));
+                    
+                    if (ugyldigePNS.length > 0) {
+                        statusHTML = `<span class="fail">UGYLDIG KODE</span>`;
+                        infoHTML = `PNS må inneholde en av: ${godkjentePNS.join(", ")}. Funnet ugyldig: ${ugyldigePNS.join(", ")}`;
+                        isError = true;
+                    } else {
+                        statusHTML = `<span class="pass">OK (${verdier.length} verdier)</span>`;
+                        infoHTML = `Alle verdier inneholder godkjente koder: ${verdier.join(", ")}`;
+                    }
+                }
                 else if (allowMultiple.includes(k)) {
-                    // Generell visning for Revisjon og Kontrollert av som tillater flere verdier
                     statusHTML = `<span class="pass">OK (${verdier.length} verdier)</span>`;
                     infoHTML = `Verdier funnet: ${verdier.join(", ")}`;
                 }
                 else {
-                    // Standardfelt (Ett sff, identisk)
                     statusHTML = `<span class="pass">OK: ${verdier[0]}</span>`;
                 }
             }
