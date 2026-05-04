@@ -2,34 +2,46 @@
 <html lang="no">
 <head>
     <meta charset="UTF-8">
-    <title>IFC Kontroll | E102 Fornebukrysset - Strand</title>
+    <title>IFC Kontroll | Leveranse E102</title>
     <style>
-        :root { --norconsult-blue: #0047bb; --error: #d9480f; --success: #2b8a3e; }
+        :root { 
+            --norconsult-blue: #0047bb; 
+            --error: #d9480f; 
+            --success: #2b8a3e; 
+            --neutral: #666;
+        }
         body { font-family: 'Segoe UI', sans-serif; background-color: #f2f2f2; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
         .header-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 40px; border-bottom: 4px solid var(--norconsult-blue); box-sizing: border-box; }
         .logo-skanska { height: 120px; } .logo-norconsult { height: 40px; }
         
-        .main-container { width: 90%; max-width: 800px; margin-top: 30px; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; box-sizing: border-box; }
+        .main-container { width: 95%; max-width: 900px; margin-top: 30px; margin-bottom: 50px; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); box-sizing: border-box; }
         
-        #drop-zone { border: 3px dashed #ccc; padding: 60px; border-radius: 10px; cursor: pointer; transition: 0.3s; background: #fafafa; }
+        #drop-zone { border: 3px dashed #ccc; padding: 50px; border-radius: 10px; cursor: pointer; transition: 0.3s; background: #fafafa; text-align: center; }
         #drop-zone.hover { border-color: var(--norconsult-blue); background: #eef4ff; }
         #drop-zone p { font-size: 1.2em; color: #555; pointer-events: none; }
 
         .result-card { margin-top: 30px; text-align: left; display: none; padding: 25px; border-radius: 5px; border: 1px solid #ddd; background: #fff; }
-        .status-header { font-size: 1.4em; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
+        .status-header { font-size: 1.6em; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #eee; text-align: center; }
         
-        .check-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee; font-size: 1.1em; }
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .check-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; background: #fdfdfd; }
+        .check-item span:first-child { font-weight: 500; color: #444; }
+        
         .fail { color: var(--error); font-weight: bold; }
         .pass { color: var(--success); font-weight: bold; }
         
-        .info-text { font-size: 0.9em; color: #666; margin-top: 10px; }
+        .summary-box { margin-top: 20px; padding: 15px; border-radius: 4px; text-align: center; font-weight: bold; }
+        .summary-fail { background: #fff5f5; color: #c92a2a; border: 1px solid #ffa8a8; }
+        .summary-pass { background: #f4fce3; color: #2b8a3e; border: 1px solid #b2f2bb; }
+        
+        .info-text { font-size: 0.85em; color: #888; margin-top: 20px; text-align: center; }
     </style>
 </head>
 <body>
 
 <header class="header-bar">
-    <h1 style="color: var(--norconsult-blue); font-size: 1.2em;">EGENKONTROLL IFC-LEVERANSE</h1>
+    <h1 style="color: var(--norconsult-blue); font-size: 1.2em;">EGENKONTROLL IFC-METADATA</h1>
     <div style="display: flex; align-items: center; gap: 20px;">
         <img src="https://download.logo.wine/logo/Skanska/Skanska-Logo.wine.png" class="logo-skanska">
         <img src="https://companieslogo.com/img/orig/NORCO.OL_BIG-2216a709.png?t=1721396473" class="logo-norconsult">
@@ -37,18 +49,19 @@
 </header>
 
 <div class="main-container">
-    <h2 style="color: #333;">Leveranse - E102 Fornebukrysset - Strand</h2>
-    <p>Dra og slipp IFC-filen under for å sjekke om <b>MMI, Revisjon og Dato</b> er på plass.</p>
+    <h2 style="text-align: center; color: #333;">Leveransekontroll: E102 Fornebukrysset - Strand</h2>
+    <p style="text-align: center;">Slipp IFC-filen her for å kontrollere at alle påkrevde egenskaper er utfylt i henhold til kravspesifikasjon.</p>
     
     <div id="drop-zone">
-        <p id="drop-text">Slipp IFC-fil her eller klikk for å velge</p>
+        <p id="drop-text">Dra IFC-fil hit eller klikk for å velge</p>
         <input type="file" id="file-input" accept=".ifc" style="display: none;">
     </div>
 
     <div id="result" class="result-card">
         <div id="status-title" class="status-header"></div>
-        <div id="check-list"></div>
-        <div class="info-text">Merk: Vi skanner de første 20MB av fila for metadata.</div>
+        <div class="grid-container" id="check-grid"></div>
+        <div id="summary-msg"></div>
+        <div class="info-text">Analyserer de første 50MB av filen for å finne Psets.</div>
     </div>
 </div>
 
@@ -58,125 +71,95 @@
     const resultCard = document.getElementById('result');
     const dropText = document.getElementById('drop-text');
 
-    // Åpne filvelger ved klikk
+    const KRAV_LISTE = [
+        "Entreprise", "FDV", "Fagkode", "Firmanavn", "Godkjent av", 
+        "Kontrollert av", "MMI", "NVDB", "Objektkode V770", "PNS", 
+        "Prosjektnavn", "Revisjon", "Revisjonsdato"
+    ];
+
     dropZone.addEventListener('click', () => fileInput.click());
-
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) handleFile(e.target.files[0]);
-    });
-
-    // Drag and drop logikk
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('hover');
-    });
-
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('hover');
-    });
-
+    fileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('hover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.classList.remove('hover');
-        if (e.dataTransfer.files.length > 0) {
-            handleFile(e.dataTransfer.files[0]);
-        }
+        if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
     });
 
     function handleFile(file) {
-        if (!file.name.toLowerCase().endswith('.ifc')) {
-            // Noen nettlesere er strenge på endelse, vi fikser sjekken her
-        }
-        
         dropText.innerText = "Analyserer " + file.name + "...";
-        
-        // Vi leser bare starten av fila (første 20MB) for å være lynraske
-        // Metadata ligger nesten alltid spredt, men 20MB holder i 99% av tilfellene.
-        const blob = file.slice(0, 20 * 1024 * 1024); 
+        resultCard.style.display = 'none';
+
+        // Vi leser de første 50MB
+        const blob = file.slice(0, 50 * 1024 * 1024); 
         const reader = new FileReader();
 
         reader.onload = function(e) {
             const content = e.target.result;
             validerMetadata(content, file.name);
         };
-
         reader.readAsText(blob);
     }
 
     function validerMetadata(text, filename) {
-        // Regex for å finne IFC verdier: vi ser etter 'FELTNAVN',$,IFCLABEL('VERDI')
-        function finnVerdi(felt) {
-            const regex = new RegExp(`'${felt}',\\$,(?:IFCLABEL|IFCIDENTIFIER|IFCTEXT)\\('([^']*)'\\)`, 'i');
+        const resultater = {};
+        
+        KRAV_LISTE.forEach(felt => {
+            // Regex som ser etter IFC-formatet: 'FELTNAVN',$,IFC_TYPE('VERDI')
+            // Håndterer IFCLABEL, IFCTEXT, IFCIDENTIFIER osv.
+            const regex = new RegExp(`'${felt}',\\$,(?:IFCLABEL|IFCIDENTIFIER|IFCTEXT|IFCPARAMETERVALUE)\\('([^']*)'\\)`, 'i');
             const match = text.match(regex);
-            return match ? match[1] : null;
-        }
+            resultater[felt] = match ? match[1] : null;
+        });
 
-        const data = {
-            MMI: finnVerdi("MMI"),
-            Revisjon: finnVerdi("Revisjon"),
-            Revisjonsdato: finnVerdi("Revisjonsdato")
-        };
-
-        visResultat(data, filename);
+        visResultat(resultater, filename);
     }
 
     function visResultat(data, filename) {
-        const list = document.getElementById('check-list');
+        const grid = document.getElementById('check-grid');
         const title = document.getElementById('status-title');
-        list.innerHTML = "";
-        dropText.innerText = "Fil sjekket: " + filename;
+        const summary = document.getElementById('summary-msg');
         
-        let errors = 0;
+        grid.innerHTML = "";
+        let feilAntall = 0;
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
 
-        // Valider MMI
-        const mmiPass = data.MMI !== null;
-        list.innerHTML += createRow("MMI", data.MMI, mmiPass);
-        if (!mmiPass) errors++;
+        KRAV_LISTE.forEach(felt => {
+            let verdi = data[felt];
+            let erOk = verdi !== null && verdi.trim() !== "" && verdi !== "-";
+            let visningsTekst = erOk ? `OK (${verdi})` : "MANGLER";
+            
+            // Spesialvalidering for Revisjonsdato
+            if (felt === "Revisjonsdato" && erOk) {
+                if (!dateRegex.test(verdi)) {
+                    erOk = false;
+                    visningsTekst = `FEIL FORMAT (${verdi})`;
+                }
+            }
 
-        // Valider Revisjon
-        const revPass = data.Revisjon !== null;
-        list.innerHTML += createRow("Revisjon", data.Revisjon, revPass);
-        if (!revPass) errors++;
+            if (!erOk) feilAntall++;
 
-        // Valider Dato
-        let datoMsg = data.Revisjonsdato;
-        let datoPass = true;
-        if (!data.Revisjonsdato) {
-            datoMsg = "MANGLER";
-            datoPass = false;
-        } else if (!dateRegex.test(data.Revisjonsdato)) {
-            datoMsg = data.Revisjonsdato + " (FEIL FORMAT - Bruk YYYY-MM-DD)";
-            datoPass = false;
-        }
-        list.innerHTML += createRow("Revisjonsdato", datoMsg, datoPass);
-        if (!datoPass) errors++;
+            grid.innerHTML += `
+                <div class="check-item">
+                    <span>${felt}</span>
+                    <span class="${erOk ? 'pass' : 'fail'}">${visningsTekst}</span>
+                </div>
+            `;
+        });
 
-        if (errors === 0) {
-            title.innerHTML = "✅ Godkjent for leveranse";
-            title.style.color = "var(--success)";
+        if (feilAntall === 0) {
+            title.innerHTML = "✅ KONTROLL UTFØRT";
+            summary.className = "summary-box summary-pass";
+            summary.innerHTML = `Modellen "${filename}" oppfyller alle metadata-krav og er klar for leveranse.`;
         } else {
-            title.innerHTML = "❌ Mangler nødvendig informasjon";
-            title.style.color = "var(--error)";
+            title.innerHTML = "❌ MANGLER DATA";
+            summary.className = "summary-box summary-fail";
+            summary.innerHTML = `Modellen har ${feilAntall} feil/mangler som må utbedres før leveranse.`;
         }
 
         resultCard.style.display = 'block';
-    }
-
-    function createRow(label, value, isPass) {
-        return `
-            <div class="check-item">
-                <span>${label}:</span>
-                <span class="${isPass ? 'pass' : 'fail'}">${isPass ? 'OK (' + value + ')' : value || 'MANGLER'}</span>
-            </div>
-        `;
-    }
-
-    // Polyfill for endswith i eldre nettlesere
-    if (!String.prototype.endswith) {
-        String.prototype.endswith = function(suffix) {
-            return this.indexOf(suffix, this.length - suffix.length) !== -1;
-        };
+        dropText.innerText = "Sjekk fullført for " + filename;
     }
 </script>
 
