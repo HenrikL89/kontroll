@@ -2,56 +2,74 @@
 <html lang="no">
 <head>
     <meta charset="UTF-8">
-    <title>Full Leveransekontroll | E102 Fornebukrysset</title>
+    <title>Metadata Kontroll | E102 Fornebukrysset</title>
     <style>
-        :root { --nc-blue: #0047bb; --err: #d9480f; --ok: #2b8a3e; }
+        :root { --nc-blue: #0047bb; --skanska-blue: #0047bb; --err: #d9480f; --ok: #2b8a3e; }
         body { font-family: 'Segoe UI', sans-serif; background: #f2f2f2; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        
         .header-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 40px; border-bottom: 4px solid var(--nc-blue); box-sizing: border-box; }
-        .logo-skanska { height: 100px; } .logo-norconsult { height: 40px; }
+        .logo-skanska { height: 120px; } .logo-norconsult { height: 45px; }
+        
         .main-container { width: 95%; max-width: 1000px; margin: 30px 0; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-        #drop-zone { border: 3px dashed #ccc; padding: 50px; border-radius: 10px; cursor: pointer; text-align: center; background: #fafafa; }
+        
+        #drop-zone { border: 3px dashed #ccc; padding: 60px; border-radius: 10px; cursor: pointer; text-align: center; background: #fafafa; transition: 0.2s; }
         #drop-zone.hover { border-color: var(--nc-blue); background: #eef4ff; }
-        .loader { display: none; margin: 20px 0; font-weight: bold; color: var(--nc-blue); }
+        
+        .loader { display: none; margin: 20px 0; font-weight: bold; color: var(--nc-blue); text-align: center; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--nc-blue); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 10px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         .result-card { display: none; margin-top: 30px; }
-        .status-header { font-size: 1.6em; font-weight: bold; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
-        th { background: #f8f9fa; }
+        .status-header { font-size: 1.6em; font-weight: bold; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
+        th, td { text-align: left; padding: 14px; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; color: #333; }
+        
         .fail { color: var(--err); font-weight: bold; }
         .pass { color: var(--ok); font-weight: bold; }
-        .warning-box { background: #fff4e6; border: 1px solid #ffd8a8; padding: 15px; border-radius: 4px; margin-bottom: 20px; color: #d9480f; font-weight: bold; }
+        .val-info { font-size: 0.85em; color: #666; display: block; margin-top: 4px; }
+        
+        .summary-box { padding: 20px; border-radius: 6px; margin-bottom: 25px; font-weight: 500; line-height: 1.5; }
+        .summary-fail { background: #fff5f5; border: 1px solid #ffa8a8; color: #c92a2a; }
+        .summary-pass { background: #f4fce3; border: 1px solid #b2f2bb; color: #2b8a3e; }
     </style>
 </head>
 <body>
 
 <header class="header-bar">
-    <h1 style="color: var(--nc-blue); font-size: 1.2em;">FULLSTENDIG OBJEKTKONTROLL</h1>
-    <div style="display: flex; align-items: center; gap: 20px;">
-        <img src="https://download.logo.wine/logo/Skanska/Skanska-Logo.wine.png" class="logo-skanska">
-        <img src="https://companieslogo.com/img/orig/NORCO.OL_BIG-2216a709.png?t=1721396473" class="logo-norconsult">
+    <h1 style="color: var(--nc-blue); font-size: 1.1em; letter-spacing: 1px;">KONTROLL AV LEVERANSE-METADATA</h1>
+    <div style="display: flex; align-items: center; gap: 30px;">
+        <img src="https://download.logo.wine/logo/Skanska/Skanska-Logo.wine.png" alt="Skanska" class="logo-skanska">
+        <img src="https://companieslogo.com/img/orig/NORCO.OL_BIG-2216a709.png?t=1721396473" alt="Norconsult" class="logo-norconsult">
     </div>
 </header>
 
 <div class="main-container">
-    <h2>E102 Fornebukrysset - Strand</h2>
-    <p>Denne kontrollen sjekker <b>samtlige objekter</b> i modellen for metadata-samsvar.</p>
+    <h2 style="text-align: center;">E102 Fornebukrysset - Strand</h2>
+    <p style="text-align: center; color: #555;">Slipp IFC-filen under for å kontrollere at <b>samtlige objekter</b> i modellen har identiske og korrekte egenskaper.</p>
     
     <div id="drop-zone">
-        <p id="drop-text">Slipp IFC-fil her for full objektanalyse</p>
+        <p id="drop-text" style="font-size: 1.2em; color: #444;">Dra og slipp IFC-fil her</p>
+        <p style="font-size: 0.9em; color: #888;">Analyserer alle objekter for fullstendig samsvar</p>
         <input type="file" id="file-input" accept=".ifc" style="display: none;">
     </div>
 
-    <div id="loader" class="loader">Analyserer alle objekter (kan ta litt tid for store filer)...</div>
+    <div id="loader" class="loader">
+        <div class="spinner"></div>
+        Analyserer modell...
+    </div>
 
     <div id="result" class="result-card">
         <div id="status-title" class="status-header"></div>
-        <div id="summary-info"></div>
-        <table id="result-table">
+        <div id="summary-msg"></div>
+        
+        <table>
             <thead>
                 <tr>
-                    <th>Egenskap</th>
-                    <th>Status / Verdi funnet</th>
-                    <th>Samsvar (Alle objekter)</th>
+                    <th>Påkrevd Egenskap</th>
+                    <th>Status / Verdi</th>
+                    <th>Detaljer (Samsvar)</th>
                 </tr>
             </thead>
             <tbody id="result-body"></tbody>
@@ -59,16 +77,18 @@
     </div>
 </div>
 
-<!-- Last inn Web-IFC fra CDN -->
 <script type="module">
     import { IfcAPI } from 'https://unpkg.com/web-ifc@0.0.44/web-ifc-api.js?module';
 
     const ifcApi = new IfcAPI();
-    // Konfigurer WASM-banen slik at den fungerer på GitHub
     ifcApi.SetWasmPath('https://unpkg.com/web-ifc@0.0.44/', true);
     await ifcApi.Init();
 
-    const KRAV = ["Entreprise", "FDV", "Fagkode", "Firmanavn", "Godkjent av", "Kontrollert av", "MMI", "NVDB", "Objektkode V770", "PNS", "Prosjektnavn", "Revisjon", "Revisjonsdato"];
+    const KRAV = [
+        "Entreprise", "FDV", "Fagkode", "Firmanavn", "Godkjent av", 
+        "Kontrollert av", "MMI", "NVDB", "Objektkode V770", "PNS", 
+        "Prosjektnavn", "Revisjon", "Revisjonsdato"
+    ];
     
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
@@ -90,9 +110,7 @@
         reader.onload = async (e) => {
             const data = new Uint8Array(e.target.result);
             const modelID = ifcApi.OpenModel(data);
-            
             analyserModell(modelID, file.name);
-            
             ifcApi.CloseModel(modelID);
             loader.style.display = 'none';
         };
@@ -100,90 +118,110 @@
     }
 
     function analyserModell(modelID, filename) {
-        // Finn alle fysiske objekter (IfcProduct og alle underklasser som IfcWall, IfcPipe etc)
-        const products = ifcApi.GetLineIDsWithType(modelID, 3031050529); // IfcProduct
+        // Henter alle IfcProduct (vegger, rør, utstyr osv)
+        const products = ifcApi.GetLineIDsWithType(modelID, 3031050529); 
         const totalObjects = products.size();
         
         let stats = {};
         KRAV.forEach(k => stats[k] = { found: 0, values: new Set(), missing: 0 });
 
-        // Gå gjennom hvert objekt
         for (let i = 0; i < totalObjects; i++) {
             const productID = products.get(i);
             const psets = ifcApi.GetPropertySets(modelID, productID, true);
-            
-            let objMetadata = {};
+            let objData = {};
 
             psets.forEach(pset => {
                 if (pset.HasProperties) {
                     pset.HasProperties.forEach(prop => {
-                        const pName = prop.Name.value;
-                        if (KRAV.includes(pName)) {
-                            const pValue = prop.NominalValue?.value;
-                            if (pValue !== undefined && pValue !== "") {
-                                objMetadata[pName] = String(pValue);
+                        const name = prop.Name.value;
+                        if (KRAV.includes(name)) {
+                            const val = prop.NominalValue?.value;
+                            if (val !== undefined && val !== "") {
+                                objData[name] = String(val).strip();
                             }
                         }
                     });
                 }
             });
 
-            // Logg resultater for dette objektet
             KRAV.forEach(k => {
-                if (objMetadata[k]) {
+                if (objData[k]) {
                     stats[k].found++;
-                    stats[k].values.add(objMetadata[k]);
+                    stats[k].values.add(objData[k]);
                 } else {
                     stats[k].missing++;
                 }
             });
         }
-
         visResultat(stats, totalObjects, filename);
     }
 
     function visResultat(stats, total, filename) {
         const body = document.getElementById('result-body');
         const title = document.getElementById('status-title');
-        const summary = document.getElementById('summary-info');
+        const summary = document.getElementById('summary-msg');
         body.innerHTML = "";
         
-        let errors = 0;
-        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        let errorList = [];
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // Strikt YYYY-MM-DD
 
         KRAV.forEach(k => {
             const s = stats[k];
             const uniqueValues = Array.from(s.values);
-            const allMatch = uniqueValues.length === 1 && s.missing === 0;
-            const valueDisplay = allMatch ? uniqueValues[0] : (s.found === 0 ? "Ingen funnet" : `${uniqueValues.length} ulike verdier funnet`);
-            
             let statusHTML = "";
-            let samsvarHTML = "";
+            let detailHTML = "";
+            let isError = false;
 
+            // 1. Sjekk om data mangler på noen objekter
             if (s.missing > 0) {
-                statusHTML = `<span class="fail">Mangler på ${s.missing} objekter</span>`;
-                errors++;
-            } else if (uniqueValues.length > 1) {
-                statusHTML = `<span class="fail">Inkonsistent (varierer)</span>`;
-                samsvarHTML = `<small>Verdier: ${uniqueValues.join(", ")}</small>`;
-                errors++;
-            } else if (k === "Revisjonsdato" && !dateRegex.test(uniqueValues[0])) {
-                statusHTML = `<span class="fail">Feil datoformat</span>`;
-                errors++;
-            } else {
-                statusHTML = `<span class="pass">OK: ${valueDisplay}</span>`;
-                samsvarHTML = `<span class="pass">100% samsvar</span>`;
+                statusHTML = `<span class="fail">MANGLER</span>`;
+                detailHTML = `Mangler på ${s.missing} av ${total} objekter.`;
+                isError = true;
+            } 
+            // 2. Sjekk om verdiene varierer på tvers av objekter
+            else if (uniqueValues.length > 1) {
+                statusHTML = `<span class="fail">INKONSISTENT</span>`;
+                detailHTML = `Ulike verdier funnet: ${uniqueValues.join(", ")}`;
+                isError = true;
+            }
+            // 3. Sjekk format på Revisjonsdato
+            else if (k === "Revisjonsdato") {
+                const datoVal = uniqueValues[0];
+                if (!dateRegex.test(datoVal)) {
+                    statusHTML = `<span class="fail">FEIL FORMAT</span>`;
+                    detailHTML = `Funnet: "${datoVal}". Påkrevd format: YYYY-MM-DD (f.eks. 2024-05-21)`;
+                    isError = true;
+                } else {
+                    statusHTML = `<span class="pass">OK: ${datoVal}</span>`;
+                    detailHTML = "Korrekt format og 100% samsvar.";
+                }
+            }
+            // 4. Alt i orden
+            else {
+                statusHTML = `<span class="pass">OK: ${uniqueValues[0]}</span>`;
+                detailHTML = "100% samsvar på alle objekter.";
             }
 
-            body.innerHTML += `<tr><td>${k}</td><td>${statusHTML}</td><td>${samsvarHTML}</td></tr>`;
+            if (isError) errorList.push(k);
+            body.innerHTML += `<tr><td><b>${k}</b></td><td>${statusHTML}</td><td><span class="val-info">${detailHTML}</span></td></tr>`;
         });
 
-        summary.innerHTML = `<div class="warning-box" style="background:${errors===0?'#f4fce3':'#fff4e6'}; border-color:${errors===0?'#b2f2bb':'#ffd8a8'}; color:${errors===0?'#2b8a3e':'#d9480f'}">
-            Sjekket ${total} objekter i "${filename}". ${errors === 0 ? "Alle objekter har identiske og korrekte metadata." : `Fant ${errors} kritiske avvik i modellen.`}
-        </div>`;
+        if (errorList.length === 0) {
+            title.innerHTML = "✅ Godkjent for leveranse";
+            title.style.color = "var(--ok)";
+            summary.innerHTML = `<div class="summary-box summary-pass">Modellen "${filename}" er kontrollert (${total} objekter). Alle påkrevde metadata er korrekt utfylt og har 100% samsvar på alle objekter.</div>`;
+        } else {
+            title.innerHTML = "❌ Avvik funnet i modellen";
+            title.style.color = "var(--err)";
+            summary.innerHTML = `<div class="summary-box summary-fail">Kontroll av "${filename}" ferdigstilt. Fant avvik i ${errorList.length} av ${KRAV.length} påkrevde egenskaper. Se tabellen under for detaljer.</div>`;
+        }
 
-        title.innerHTML = errors === 0 ? "✅ Modellen er validert" : "❌ Modellen har metadata-avvik";
         resultCard.style.display = 'block';
+    }
+
+    // String helper
+    if (!String.prototype.strip) {
+        String.prototype.strip = function() { return this.trim(); };
     }
 </script>
 
