@@ -13,10 +13,15 @@
         
         .main-container { width: 95%; max-width: 900px; margin: 30px 0; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
         
-        #drop-zone { border: 3px dashed #ccc; padding: 60px; border-radius: 10px; cursor: pointer; text-align: center; background: #fafafa; transition: 0.2s; }
+        #drop-zone { border: 3px dashed #ccc; padding: 60px; border-radius: 10px; cursor: pointer; text-align: center; background: #fafafa; transition: 0.2s; position: relative; }
         #drop-zone.hover { border-color: var(--nc-blue); background: #eef4ff; }
         
-        .result-card { display: none; margin-top: 30px; }
+        /* Laste-animasjon */
+        .loader-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); border-radius: 10px; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--nc-blue); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .result-card { display: none; margin-top: 30px; width: 100%; }
         .status-header { font-size: 1.6em; font-weight: bold; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -30,6 +35,8 @@
         .summary-box { padding: 20px; border-radius: 6px; margin-bottom: 25px; font-weight: 500; text-align: center; }
         .summary-fail { background: #fff5f5; border: 1px solid #ffa8a8; color: #c92a2a; }
         .summary-pass { background: #f4fce3; border: 1px solid #b2f2bb; color: #2b8a3e; }
+        
+        small { display: block; color: #666; margin-top: 4px; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -44,8 +51,12 @@
 
 <div class="main-container">
     <div id="drop-zone">
-        <p style="font-size: 1.3em; color: #444;">Dra og slipp IFC-fil her for kontroll</p>
-        <p style="color: #888;">Analyserer metadata direkte fra filstrukturen...</p>
+        <div class="loader-overlay" id="loader">
+            <div class="spinner"></div>
+            <b id="loader-text">Analyserer filstruktur...</b>
+        </div>
+        <p id="drop-instruction" style="font-size: 1.3em; color: #444;">Dra og slipp IFC-fil her for kontroll</p>
+        <p style="color: #888;">Støtter flere revisjoner og objektkoder i samme fil.</p>
         <input type="file" id="file-input" accept=".ifc" style="display: none;">
     </div>
 
@@ -76,6 +87,9 @@
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const resultCard = document.getElementById('result');
+    const loader = document.getElementById('loader');
+    const loaderText = document.getElementById('loader-text');
+    const body = document.getElementById('result-body');
 
     dropZone.onclick = () => fileInput.click();
     fileInput.onchange = (e) => handleFile(e.target.files[0]);
@@ -89,10 +103,21 @@
 
     function handleFile(file) {
         if (!file) return;
+
+        // Reset UI og vis laster
+        resultCard.style.display = 'none';
+        loader.style.display = 'flex';
+        loaderText.innerText = "Leser " + file.name + "...";
+
         const reader = new FileReader();
         reader.onload = (e) => {
             const content = e.target.result;
-            analyserTekst(content, file.name);
+            // Bruk setTimeout for å la browseren vise laster-animasjonen før tung Regex starter
+            setTimeout(() => {
+                analyserTekst(content, file.name);
+                loader.style.display = 'none';
+                fileInput.value = ""; // Nullstill input slik at samme fil kan velges på nytt
+            }, 100);
         };
         reader.readAsText(file);
     }
@@ -118,14 +143,13 @@
     }
 
     function visResultat(funn, filename) {
-        const body = document.getElementById('result-body');
         const title = document.getElementById('status-title');
         const summary = document.getElementById('summary-msg');
         body.innerHTML = "";
         
         let feilAntall = 0;
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
-        const objektkodeRegex = /^\d{8}$/; // Nøyaktig 8 siffer
+        const objektkodeRegex = /^\d{8}$/; // 8 siffer
 
         KRAV.forEach(k => {
             const verdier = Array.from(funn[k]);
@@ -133,61 +157,61 @@
             let infoHTML = "";
             let isError = false;
 
-            // 1. Sjekk om egenskapen mangler helt
+            // Definerer hvilke felt som tillater flere ulike verdier (Multi-fields)
+            const allowMultiple = ["Objektkode V770", "Kontrollert av", "Revisjon", "Revisjonsdato"];
+
             if (verdier.length === 0) {
                 statusHTML = `<span class="fail">MANGLER</span>`;
                 infoHTML = `Egenskapen ble ikke funnet i fila.`;
                 isError = true;
             } 
-            // 2. Sjekk for inkonsistente verdier (unntatt Objektkode V770)
-            else if (verdier.length > 1 && k !== "Objektkode V770") {
+            else if (verdier.length > 1 && !allowMultiple.includes(k)) {
+                // Disse feltene må være like på alle objekter (f.eks. Prosjektnavn)
                 statusHTML = `<span class="fail">INKONSISTENT</span>`;
-                infoHTML = `Funnet flere ulike verdier: ${verdier.join(", ")}`;
+                infoHTML = `Funnet flere ulike verdier: ${verdier.join(", ")}. Må være identisk på alle objekter.`;
                 isError = true;
             } 
             else {
-                const v = verdier[0]; // Referanseverdi for standard-sjekker
-                
-                // SPESIFIKK SJEKK: Godkjent av
+                // Sjekker spesifikke formater
                 if (k === "Godkjent av") {
-                    if (v !== "ThSel") {
-                        statusHTML = `<span class="fail">FEIL VERDI: ${v}</span>`;
+                    if (verdier[0] !== "ThSel") {
+                        statusHTML = `<span class="fail">FEIL VERDI: ${verdier[0]}</span>`;
                         infoHTML = `Påkrevd godkjenner: ThSel`;
                         isError = true;
                     } else {
-                        statusHTML = `<span class="pass">OK: ${v}</span>`;
-                        infoHTML = `Godkjent verdi.`;
+                        statusHTML = `<span class="pass">OK: ThSel</span>`;
                     }
                 } 
-                // SPESIFIKK SJEKK: Objektkode V770 (Sjekker ALLE verdier som er funnet)
+                else if (k === "Revisjonsdato") {
+                    const ugyldigeDatoer = verdier.filter(d => !dateRegex.test(d));
+                    if (ugyldigeDatoer.length > 0) {
+                        statusHTML = `<span class="fail">FEIL FORMAT</span>`;
+                        infoHTML = `Alle datoer må følge YYYY-MM-DD. Funnet feil: ${ugyldigeDatoer.join(", ")}`;
+                        isError = true;
+                    } else {
+                        statusHTML = `<span class="pass">OK (${verdier.length} datoer)</span>`;
+                        infoHTML = `Alle datoer har korrekt format: ${verdier.join(", ")}`;
+                    }
+                }
                 else if (k === "Objektkode V770") {
-                    const ugyldigeKoder = verdier.filter(kode => !objektkodeRegex.test(kode));
-                    
+                    const ugyldigeKoder = verdier.filter(c => !objektkodeRegex.test(c));
                     if (ugyldigeKoder.length > 0) {
-                        statusHTML = `<span class="fail">FEIL FORMAT: ${ugyldigeKoder.join(", ")}</span>`;
-                        infoHTML = `Alle objektkoder må inneholde nøyaktig 8 siffer.`;
+                        statusHTML = `<span class="fail">FEIL FORMAT</span>`;
+                        infoHTML = `Alle koder må være 8 siffer. Funnet feil: ${ugyldigeKoder.join(", ")}`;
                         isError = true;
                     } else {
                         statusHTML = `<span class="pass">OK (${verdier.length} koder)</span>`;
-                        infoHTML = `Alle funne koder er gyldige: ${verdier.join(", ")}`;
-                        isError = false;
+                        infoHTML = `Alle koder er gyldige: ${verdier.join(", ")}`;
                     }
                 }
-                // SPESIFIKK SJEKK: Revisjonsdato
-                else if (k === "Revisjonsdato") {
-                    if (!dateRegex.test(v)) {
-                        statusHTML = `<span class="fail">FEIL FORMAT: ${v}</span>`;
-                        infoHTML = `Påkrevd format: YYYY-MM-DD`;
-                        isError = true;
-                    } else {
-                        statusHTML = `<span class="pass">OK: ${v}</span>`;
-                        infoHTML = `Korrekt datoformat.`;
-                    }
-                } 
-                // STANDARD SJEKK FOR RESTEN
+                else if (allowMultiple.includes(k)) {
+                    // Generell visning for Revisjon og Kontrollert av som tillater flere verdier
+                    statusHTML = `<span class="pass">OK (${verdier.length} verdier)</span>`;
+                    infoHTML = `Verdier funnet: ${verdier.join(", ")}`;
+                }
                 else {
-                    statusHTML = `<span class="pass">OK: ${v}</span>`;
-                    infoHTML = `Verdi bekreftet.`;
+                    // Standardfelt (Ett sff, identisk)
+                    statusHTML = `<span class="pass">OK: ${verdier[0]}</span>`;
                 }
             }
 
@@ -206,12 +230,12 @@
 
         summary.className = feilAntall === 0 ? "summary-box summary-pass" : "summary-box summary-fail";
         summary.innerHTML = feilAntall === 0 
-            ? `✅ Modellen "${filename}" er kontrollert og godkjent.` 
+            ? `✅ Modellen "${filename}" er godkjent.` 
             : `❌ Modellen "${filename}" har ${feilAntall} avvik.`;
 
         title.innerHTML = feilAntall === 0 ? "Godkjent for leveranse" : "Avvik funnet i metadata";
         resultCard.style.display = 'block';
-        window.scrollTo(0, document.body.scrollHeight);
+        window.scrollTo({ top: resultCard.offsetTop - 50, behavior: 'smooth' });
     }
 </script>
 
