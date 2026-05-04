@@ -24,6 +24,7 @@
         .summary-box { padding: 20px; border-radius: 6px; margin-bottom: 25px; font-weight: 500; }
         .summary-fail { background: #fff5f5; border: 1px solid #ffa8a8; color: #c92a2a; }
         .summary-pass { background: #f4fce3; border: 1px solid #b2f2bb; color: #2b8a3e; }
+        .val-list { font-size: 0.85em; color: #555; }
     </style>
 </head>
 <body>
@@ -40,14 +41,15 @@
     <h2 style="text-align: center;">E102 Fornebukrysset - Strand</h2>
     <div id="drop-zone">
         <p style="font-size: 1.2em; color: #444;">Dra og slipp IFC-fil her</p>
+        <p style="font-size: 0.9em; color: #888;">Analyserer alle objekter og egenskaper...</p>
         <input type="file" id="file-input" accept=".ifc" style="display: none;">
     </div>
-    <div id="loader" class="loader"><div class="spinner"></div>Analyserer modell...</div>
+    <div id="loader" class="loader"><div class="spinner"></div>Søker gjennom hele IFC-strukturen...</div>
     <div id="result" class="result-card">
         <div id="status-title" class="status-header"></div>
         <div id="summary-msg"></div>
         <table>
-            <thead><tr><th>Egenskap</th><th>Status / Verdi</th><th>Samsvar</th></tr></thead>
+            <thead><tr><th>Påkrevd Egenskap</th><th>Status / Verdi</th><th>Samsvar (Alle objekter)</th></tr></thead>
             <tbody id="result-body"></tbody>
         </table>
     </div>
@@ -79,55 +81,79 @@
         reader.onload = async (e) => {
             const data = new Uint8Array(e.target.result);
             const modelID = ifcApi.OpenModel(data);
-            analyserModell(modelID, file.name);
+            await analyserModell(modelID, file.name);
             ifcApi.CloseModel(modelID);
             loader.style.display = 'none';
         };
         reader.readAsArrayBuffer(file);
     }
 
-    // Hjelpefunksjon for å hente verdi fra ulike IFC-datatyper
-    function getVal(nominalValue) {
-        if (!nominalValue) return null;
-        if (nominalValue.value !== undefined) return nominalValue.value;
-        if (nominalValue.label !== undefined) return nominalValue.label;
+    // Ekstremt robust verdi-uthenter
+    function extractValue(nominalValue) {
+        if (nominalValue === null || nominalValue === undefined) return null;
+        if (typeof nominalValue === 'object') {
+            // Sjekker alle kjente felter web-ifc bruker for verdier
+            const val = nominalValue.value !== undefined ? nominalValue.value : 
+                        nominalValue.label !== undefined ? nominalValue.label : null;
+            return val;
+        }
         return nominalValue;
     }
 
-    function analyserModell(modelID, filename) {
-        const products = ifcApi.GetLineIDsWithType(modelID, 3031050529); 
+    async function analyserModell(modelID, filename) {
+        const products = ifcApi.GetLineIDsWithType(modelID, 3031050529); // IfcProduct
         const totalObjects = products.size();
+        
+        // Map for å lagre egenskaper per objekt: Map<ObjectID, {PropName: Value}>
+        const objectPropertyMap = new Map();
+
+        // Vi går gjennom alle Property-relasjoner manuelt (dette er mest treffsikkert)
+        const relations = ifcApi.GetLineIDsWithType(modelID, 3965522501); // IfcRelDefinesByProperties
+        for (let i = 0; i < relations.size(); i++) {
+            const rel = ifcApi.GetLine(modelID, relations.get(i), true);
+            if (!rel || !rel.RelatingPropertyDefinition || !rel.RelatedObjects) continue;
+
+            const pset = ifcApi.GetLine(modelID, rel.RelatingPropertyDefinition.value, true);
+            if (!pset || !pset.HasProperties) continue;
+
+            for (const propRel of pset.HasProperties) {
+                const prop = ifcApi.GetLine(modelID, propRel.value, true);
+                if (!prop || !prop.Name) continue;
+
+                const pName = prop.Name.value;
+                if (KRAV.includes(pName)) {
+                    const finalValue = extractValue(prop.NominalValue);
+                    
+                    if (finalValue !== null && String(finalValue).trim() !== "") {
+                        // Koble denne verdien til alle objektene i relasjonen
+                        for (const objRef of rel.RelatedObjects) {
+                            const objID = objRef.value;
+                            if (!objectPropertyMap.has(objID)) objectPropertyMap.set(objID, {});
+                            objectPropertyMap.get(objID)[pName] = String(finalValue).trim();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Beregn statistikk basert på alle IfcProducts
         let stats = {};
         KRAV.forEach(k => stats[k] = { found: 0, values: new Set(), missing: 0 });
 
         for (let i = 0; i < totalObjects; i++) {
-            const productID = products.get(i);
-            const psets = ifcApi.GetPropertySets(modelID, productID, true);
-            let objData = {};
-
-            psets.forEach(pset => {
-                if (pset.HasProperties) {
-                    pset.HasProperties.forEach(prop => {
-                        const name = prop.Name.value;
-                        if (KRAV.includes(name)) {
-                            let val = getVal(prop.NominalValue);
-                            if (val !== null && val !== undefined && String(val).trim() !== "") {
-                                objData[name] = String(val).trim();
-                            }
-                        }
-                    });
-                }
-            });
+            const objID = products.get(i);
+            const props = objectPropertyMap.get(objID) || {};
 
             KRAV.forEach(k => {
-                if (objData[k]) {
+                if (props[k]) {
                     stats[k].found++;
-                    stats[k].values.add(objData[k]);
+                    stats[k].values.add(props[k]);
                 } else {
                     stats[k].missing++;
                 }
             });
         }
+
         visResultat(stats, totalObjects, filename);
     }
 
@@ -143,24 +169,35 @@
             const s = stats[k];
             const uniqueValues = Array.from(s.values);
             let statusHTML = "";
-            let samsvarHTML = "100% samsvar";
+            let samsvarHTML = "";
             let isError = false;
 
-            if (s.missing > 0) {
-                statusHTML = `<span class="fail">MANGLER PÅ ${s.missing} OBJEKTER</span>`;
+            if (s.found === 0) {
+                statusHTML = `<span class="fail">IKKE FUNNET I MODELLEN</span>`;
+                samsvarHTML = "Mangler på alle objekter";
+                isError = true;
+            } else if (s.missing > 0) {
+                statusHTML = `<span class="fail">DELVIS MANGLER</span>`;
+                samsvarHTML = `Mangler på ${s.missing} av ${total} objekter. Funnet: ${uniqueValues.join(", ")}`;
                 isError = true;
             } else if (uniqueValues.length > 1) {
                 statusHTML = `<span class="fail">INKONSISTENT</span>`;
-                samsvarHTML = `<small>Ulike verdier: ${uniqueValues.join(", ")}</small>`;
+                samsvarHTML = `Ulike verdier funnet: ${uniqueValues.join(" | ")}`;
                 isError = true;
             } else {
-                const val = uniqueValues[0] || "TOM";
-                if (k === "Revisjonsdato" && !dateRegex.test(val)) {
-                    statusHTML = `<span class="fail">FEIL FORMAT: ${val}</span>`;
-                    samsvarHTML = `<small>Påkrevd: YYYY-MM-DD</small>`;
-                    isError = true;
+                const val = uniqueValues[0];
+                if (k === "Revisjonsdato") {
+                    if (!dateRegex.test(val)) {
+                        statusHTML = `<span class="fail">FEIL FORMAT: "${val}"</span>`;
+                        samsvarHTML = `Krav: YYYY-MM-DD`;
+                        isError = true;
+                    } else {
+                        statusHTML = `<span class="pass">OK: ${val}</span>`;
+                        samsvarHTML = `100% samsvar`;
+                    }
                 } else {
                     statusHTML = `<span class="pass">OK: ${val}</span>`;
+                    samsvarHTML = `100% samsvar`;
                 }
             }
 
@@ -169,7 +206,7 @@
         });
 
         summary.className = errors === 0 ? "summary-box summary-pass" : "summary-box summary-fail";
-        summary.innerHTML = errors === 0 ? `Modellen "${filename}" er godkjent.` : `Modellen "${filename}" har ${errors} avvik.`;
+        summary.innerHTML = errors === 0 ? `Modellen "${filename}" er godkjent.` : `Fant ${errors} avvik i "${filename}".`;
         title.innerHTML = errors === 0 ? "✅ Godkjent" : "❌ Avvik funnet";
         resultCard.style.display = 'block';
     }
