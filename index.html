@@ -7,7 +7,6 @@
         :root { --nc-blue: #0047bb; --err: #d9480f; --ok: #2b8a3e; }
         body { font-family: 'Segoe UI', sans-serif; background: #f2f2f2; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
-        /* Header med Skanska (3x) og Norconsult logo */
         .header-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 40px; border-bottom: 4px solid var(--nc-blue); box-sizing: border-box; min-height: 160px; }
         .logo-skanska { height: 150px; } .logo-norconsult { height: 50px; }
         .logo-wrapper { display: flex; align-items: center; gap: 30px; }
@@ -40,7 +39,8 @@
     <div class="logo-wrapper">
         <img src="https://download.logo.wine/logo/Skanska/Skanska-Logo.wine.png" alt="Skanska" class="logo-skanska">
         <img src="https://companieslogo.com/img/orig/NORCO.OL_BIG-2216a709.png?t=1721396473" alt="Norconsult" class="logo-norconsult">
-    </header>
+    </div>
+</header>
 
 <div class="main-container">
     <div id="drop-zone">
@@ -67,9 +67,10 @@
 </div>
 
 <script>
-    const KRAV = [
-        "Entreprise", "FDV", "Fagkode", "Firmanavn", "Godkjent av", 
-        "Kontrollert av", "MMI", "NVDB", "Objektkode V770", "PNS", 
+    // KRAV-listen er oppdatert (FDV og NVDB er fjernet)
+    const KRAV =[
+        "Entreprise", "Fagkode", "Firmanavn", "Godkjent av", 
+        "Kontrollert av", "MMI", "Objektkode V770", "PNS", 
         "Prosjektnavn", "Revisjon", "Revisjonsdato"
     ];
 
@@ -81,13 +82,15 @@
     fileInput.onchange = (e) => handleFile(e.target.files[0]);
     dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('hover'); };
     dropZone.ondragleave = () => dropZone.classList.remove('hover');
-    dropZone.ondrop = (e) => { e.preventDefault(); dropZone.classList.remove('hover'); handleFile(e.dataTransfer.files[0]); };
+    dropZone.ondrop = (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('hover');
+        handleFile(e.dataTransfer.files[0]);
+    };
 
     function handleFile(file) {
         if (!file) return;
-        
         const reader = new FileReader();
-        // Vi leser hele fila som tekst (Regex er effektivt selv på store filer)
         reader.onload = (e) => {
             const content = e.target.result;
             analyserTekst(content, file.name);
@@ -99,9 +102,6 @@
         let funn = {};
         KRAV.forEach(k => funn[k] = new Set());
 
-        // REGEX forklart: 
-        // Leter etter IFCPROPERTYSINGLEVALUE
-        // ( 'Navn' , $ , DATATYPE ( 'Verdi' )
         const regex = /IFCPROPERTYSINGLEVALUE\s*\(\s*'([^']+)'\s*,\s*\$\s*,\s*[A-Z]+\s*\(\s*'([^']*)'\s*\)/g;
         
         let match;
@@ -115,7 +115,6 @@
                 }
             }
         }
-
         visResultat(funn, filename);
     }
 
@@ -127,6 +126,7 @@
         
         let feilAntall = 0;
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
+        const objKodeRegex = /\d{8}/; // Leter etter 8 sammenhengende tall
 
         KRAV.forEach(k => {
             const verdier = Array.from(funn[k]);
@@ -144,16 +144,42 @@
                 isError = true;
             } else {
                 const v = verdier[0];
-                if (k === "Revisjonsdato") {
+                
+                // SPESIFIKK SJEKK: Kontrollert av (Må være ThSel)
+                if (k === "Kontrollert av") {
+                    if (v !== "ThSel") {
+                        statusHTML = `<span class="fail">FEIL VERDI: ${v}</span>`;
+                        infoHTML = `Påkrevd kontrollør: ThSel`;
+                        isError = true;
+                    } else {
+                        statusHTML = `<span class="pass">OK: ${v}</span>`;
+                        infoHTML = `Godkjent kontrollør.`;
+                    }
+                } 
+                // SPESIFIKK SJEKK: Revisjonsdato (Format YYYY-MM-DD)
+                else if (k === "Revisjonsdato") {
                     if (!dateRegex.test(v)) {
                         statusHTML = `<span class="fail">FEIL FORMAT: ${v}</span>`;
                         infoHTML = `Påkrevd format: YYYY-MM-DD`;
                         isError = true;
                     } else {
                         statusHTML = `<span class="pass">OK: ${v}</span>`;
-                        infoHTML = `Korrekt format.`;
+                        infoHTML = `Korrekt datoformat.`;
                     }
-                } else {
+                }
+                // SPESIFIKK SJEKK: Objektkode V770 (Må inneholde 8-sifret tall)
+                else if (k === "Objektkode V770") {
+                    if (!objKodeRegex.test(v)) {
+                        statusHTML = `<span class="fail">FEIL VERDI: ${v}</span>`;
+                        infoHTML = `Må inneholde et 8-sifret tall.`;
+                        isError = true;
+                    } else {
+                        statusHTML = `<span class="pass">OK: ${v}</span>`;
+                        infoHTML = `Inneholder gyldig kode.`;
+                    }
+                }
+                // STANDARD SJEKK:
+                else {
                     statusHTML = `<span class="pass">OK: ${v}</span>`;
                     infoHTML = `Verdi bekreftet.`;
                 }
@@ -174,8 +200,8 @@
 
         summary.className = feilAntall === 0 ? "summary-box summary-pass" : "summary-box summary-fail";
         summary.innerHTML = feilAntall === 0 
-            ? `✅ Modellen "${filename}" er kontrollert og godkjent.` 
-            : `❌ Modellen "${filename}" har ${feilAntall} avvik som må utbedres.`;
+            ? `✅ Modellen "${filename}" er godkjent.` 
+            : `❌ Modellen "${filename}" har ${feilAntall} avvik.`;
 
         title.innerHTML = feilAntall === 0 ? "Godkjent for leveranse" : "Avvik funnet i metadata";
         resultCard.style.display = 'block';
