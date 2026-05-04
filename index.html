@@ -2,46 +2,30 @@
 <html lang="no">
 <head>
     <meta charset="UTF-8">
-    <title>IFC Kontroll | Leveranse E102</title>
+    <title>Full Leveransekontroll | E102 Fornebukrysset</title>
     <style>
-        :root { 
-            --norconsult-blue: #0047bb; 
-            --error: #d9480f; 
-            --success: #2b8a3e; 
-            --neutral: #666;
-        }
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f2f2f2; margin: 0; display: flex; flex-direction: column; align-items: center; }
-        
-        .header-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 40px; border-bottom: 4px solid var(--norconsult-blue); box-sizing: border-box; }
-        .logo-skanska { height: 120px; } .logo-norconsult { height: 40px; }
-        
-        .main-container { width: 95%; max-width: 900px; margin-top: 30px; margin-bottom: 50px; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); box-sizing: border-box; }
-        
-        #drop-zone { border: 3px dashed #ccc; padding: 50px; border-radius: 10px; cursor: pointer; transition: 0.3s; background: #fafafa; text-align: center; }
-        #drop-zone.hover { border-color: var(--norconsult-blue); background: #eef4ff; }
-        #drop-zone p { font-size: 1.2em; color: #555; pointer-events: none; }
-
-        .result-card { margin-top: 30px; text-align: left; display: none; padding: 25px; border-radius: 5px; border: 1px solid #ddd; background: #fff; }
-        .status-header { font-size: 1.6em; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #eee; text-align: center; }
-        
-        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .check-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; background: #fdfdfd; }
-        .check-item span:first-child { font-weight: 500; color: #444; }
-        
-        .fail { color: var(--error); font-weight: bold; }
-        .pass { color: var(--success); font-weight: bold; }
-        
-        .summary-box { margin-top: 20px; padding: 15px; border-radius: 4px; text-align: center; font-weight: bold; }
-        .summary-fail { background: #fff5f5; color: #c92a2a; border: 1px solid #ffa8a8; }
-        .summary-pass { background: #f4fce3; color: #2b8a3e; border: 1px solid #b2f2bb; }
-        
-        .info-text { font-size: 0.85em; color: #888; margin-top: 20px; text-align: center; }
+        :root { --nc-blue: #0047bb; --err: #d9480f; --ok: #2b8a3e; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f2f2f2; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        .header-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 40px; border-bottom: 4px solid var(--nc-blue); box-sizing: border-box; }
+        .logo-skanska { height: 100px; } .logo-norconsult { height: 40px; }
+        .main-container { width: 95%; max-width: 1000px; margin: 30px 0; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        #drop-zone { border: 3px dashed #ccc; padding: 50px; border-radius: 10px; cursor: pointer; text-align: center; background: #fafafa; }
+        #drop-zone.hover { border-color: var(--nc-blue); background: #eef4ff; }
+        .loader { display: none; margin: 20px 0; font-weight: bold; color: var(--nc-blue); }
+        .result-card { display: none; margin-top: 30px; }
+        .status-header { font-size: 1.6em; font-weight: bold; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; }
+        .fail { color: var(--err); font-weight: bold; }
+        .pass { color: var(--ok); font-weight: bold; }
+        .warning-box { background: #fff4e6; border: 1px solid #ffd8a8; padding: 15px; border-radius: 4px; margin-bottom: 20px; color: #d9480f; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <header class="header-bar">
-    <h1 style="color: var(--norconsult-blue); font-size: 1.2em;">EGENKONTROLL IFC-METADATA</h1>
+    <h1 style="color: var(--nc-blue); font-size: 1.2em;">FULLSTENDIG OBJEKTKONTROLL</h1>
     <div style="display: flex; align-items: center; gap: 20px;">
         <img src="https://download.logo.wine/logo/Skanska/Skanska-Logo.wine.png" class="logo-skanska">
         <img src="https://companieslogo.com/img/orig/NORCO.OL_BIG-2216a709.png?t=1721396473" class="logo-norconsult">
@@ -49,117 +33,157 @@
 </header>
 
 <div class="main-container">
-    <h2 style="text-align: center; color: #333;">Leveransekontroll: E102 Fornebukrysset - Strand</h2>
-    <p style="text-align: center;">Slipp IFC-filen her for å kontrollere at alle påkrevde egenskaper er utfylt i henhold til kravspesifikasjon.</p>
+    <h2>E102 Fornebukrysset - Strand</h2>
+    <p>Denne kontrollen sjekker <b>samtlige objekter</b> i modellen for metadata-samsvar.</p>
     
     <div id="drop-zone">
-        <p id="drop-text">Dra IFC-fil hit eller klikk for å velge</p>
+        <p id="drop-text">Slipp IFC-fil her for full objektanalyse</p>
         <input type="file" id="file-input" accept=".ifc" style="display: none;">
     </div>
 
+    <div id="loader" class="loader">Analyserer alle objekter (kan ta litt tid for store filer)...</div>
+
     <div id="result" class="result-card">
         <div id="status-title" class="status-header"></div>
-        <div class="grid-container" id="check-grid"></div>
-        <div id="summary-msg"></div>
-        <div class="info-text">Analyserer de første 50MB av filen for å finne Psets.</div>
+        <div id="summary-info"></div>
+        <table id="result-table">
+            <thead>
+                <tr>
+                    <th>Egenskap</th>
+                    <th>Status / Verdi funnet</th>
+                    <th>Samsvar (Alle objekter)</th>
+                </tr>
+            </thead>
+            <tbody id="result-body"></tbody>
+        </table>
     </div>
 </div>
 
-<script>
+<!-- Last inn Web-IFC fra CDN -->
+<script type="module">
+    import { IfcAPI } from 'https://unpkg.com/web-ifc@0.0.44/web-ifc-api.js?module';
+
+    const ifcApi = new IfcAPI();
+    // Konfigurer WASM-banen slik at den fungerer på GitHub
+    ifcApi.SetWasmPath('https://unpkg.com/web-ifc@0.0.44/', true);
+    await ifcApi.Init();
+
+    const KRAV = ["Entreprise", "FDV", "Fagkode", "Firmanavn", "Godkjent av", "Kontrollert av", "MMI", "NVDB", "Objektkode V770", "PNS", "Prosjektnavn", "Revisjon", "Revisjonsdato"];
+    
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
+    const loader = document.getElementById('loader');
     const resultCard = document.getElementById('result');
-    const dropText = document.getElementById('drop-text');
 
-    const KRAV_LISTE = [
-        "Entreprise", "Fagkode", "Firmanavn", "Godkjent av", 
-        "Kontrollert av", "MMI", "NVDB", "Objektkode V770", "PNS", 
-        "Prosjektnavn", "Revisjon", "Revisjonsdato"
-    ];
+    dropZone.onclick = () => fileInput.click();
+    fileInput.onchange = (e) => handleFile(e.target.files[0]);
+    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('hover'); };
+    dropZone.ondragleave = () => dropZone.classList.remove('hover');
+    dropZone.ondrop = (e) => { e.preventDefault(); dropZone.classList.remove('hover'); handleFile(e.dataTransfer.files[0]); };
 
-    dropZone.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('hover'); });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('hover');
-        if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
-    });
-
-    function handleFile(file) {
-        dropText.innerText = "Analyserer " + file.name + "...";
+    async function handleFile(file) {
+        if (!file) return;
+        loader.style.display = 'block';
         resultCard.style.display = 'none';
 
-        // Vi leser de første 50MB
-        const blob = file.slice(0, 50 * 1024 * 1024); 
         const reader = new FileReader();
-
-        reader.onload = function(e) {
-            const content = e.target.result;
-            validerMetadata(content, file.name);
-        };
-        reader.readAsText(blob);
-    }
-
-    function validerMetadata(text, filename) {
-        const resultater = {};
-        
-        KRAV_LISTE.forEach(felt => {
-            // Regex som ser etter IFC-formatet: 'FELTNAVN',$,IFC_TYPE('VERDI')
-            // Håndterer IFCLABEL, IFCTEXT, IFCIDENTIFIER osv.
-            const regex = new RegExp(`'${felt}',\\$,(?:IFCLABEL|IFCIDENTIFIER|IFCTEXT|IFCPARAMETERVALUE)\\('([^']*)'\\)`, 'i');
-            const match = text.match(regex);
-            resultater[felt] = match ? match[1] : null;
-        });
-
-        visResultat(resultater, filename);
-    }
-
-    function visResultat(data, filename) {
-        const grid = document.getElementById('check-grid');
-        const title = document.getElementById('status-title');
-        const summary = document.getElementById('summary-msg');
-        
-        grid.innerHTML = "";
-        let feilAntall = 0;
-        const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
-
-        KRAV_LISTE.forEach(felt => {
-            let verdi = data[felt];
-            let erOk = verdi !== null && verdi.trim() !== "" && verdi !== "-";
-            let visningsTekst = erOk ? `OK (${verdi})` : "MANGLER";
+        reader.onload = async (e) => {
+            const data = new Uint8Array(e.target.result);
+            const modelID = ifcApi.OpenModel(data);
             
-            // Spesialvalidering for Revisjonsdato
-            if (felt === "Revisjonsdato" && erOk) {
-                if (!dateRegex.test(verdi)) {
-                    erOk = false;
-                    visningsTekst = `FEIL FORMAT (${verdi})`;
+            analyserModell(modelID, file.name);
+            
+            ifcApi.CloseModel(modelID);
+            loader.style.display = 'none';
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function analyserModell(modelID, filename) {
+        // Finn alle fysiske objekter (IfcProduct og alle underklasser som IfcWall, IfcPipe etc)
+        const products = ifcApi.GetLineIDsWithType(modelID, 3031050529); // IfcProduct
+        const totalObjects = products.size();
+        
+        let stats = {};
+        KRAV.forEach(k => stats[k] = { found: 0, values: new Set(), missing: 0 });
+
+        // Gå gjennom hvert objekt
+        for (let i = 0; i < totalObjects; i++) {
+            const productID = products.get(i);
+            const psets = ifcApi.GetPropertySets(modelID, productID, true);
+            
+            let objMetadata = {};
+
+            psets.forEach(pset => {
+                if (pset.HasProperties) {
+                    pset.HasProperties.forEach(prop => {
+                        const pName = prop.Name.value;
+                        if (KRAV.includes(pName)) {
+                            const pValue = prop.NominalValue?.value;
+                            if (pValue !== undefined && pValue !== "") {
+                                objMetadata[pName] = String(pValue);
+                            }
+                        }
+                    });
                 }
-            }
+            });
 
-            if (!erOk) feilAntall++;
-
-            grid.innerHTML += `
-                <div class="check-item">
-                    <span>${felt}</span>
-                    <span class="${erOk ? 'pass' : 'fail'}">${visningsTekst}</span>
-                </div>
-            `;
-        });
-
-        if (feilAntall === 0) {
-            title.innerHTML = "✅ KONTROLL UTFØRT";
-            summary.className = "summary-box summary-pass";
-            summary.innerHTML = `Modellen "${filename}" oppfyller alle metadata-krav og er klar for leveranse.`;
-        } else {
-            title.innerHTML = "❌ MANGLER DATA";
-            summary.className = "summary-box summary-fail";
-            summary.innerHTML = `Modellen har ${feilAntall} feil/mangler som må utbedres før leveranse.`;
+            // Logg resultater for dette objektet
+            KRAV.forEach(k => {
+                if (objMetadata[k]) {
+                    stats[k].found++;
+                    stats[k].values.add(objMetadata[k]);
+                } else {
+                    stats[k].missing++;
+                }
+            });
         }
 
+        visResultat(stats, totalObjects, filename);
+    }
+
+    function visResultat(stats, total, filename) {
+        const body = document.getElementById('result-body');
+        const title = document.getElementById('status-title');
+        const summary = document.getElementById('summary-info');
+        body.innerHTML = "";
+        
+        let errors = 0;
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+        KRAV.forEach(k => {
+            const s = stats[k];
+            const uniqueValues = Array.from(s.values);
+            const allMatch = uniqueValues.length === 1 && s.missing === 0;
+            const valueDisplay = allMatch ? uniqueValues[0] : (s.found === 0 ? "Ingen funnet" : `${uniqueValues.length} ulike verdier funnet`);
+            
+            let statusHTML = "";
+            let samsvarHTML = "";
+
+            if (s.missing > 0) {
+                statusHTML = `<span class="fail">Mangler på ${s.missing} objekter</span>`;
+                errors++;
+            } else if (uniqueValues.length > 1) {
+                statusHTML = `<span class="fail">Inkonsistent (varierer)</span>`;
+                samsvarHTML = `<small>Verdier: ${uniqueValues.join(", ")}</small>`;
+                errors++;
+            } else if (k === "Revisjonsdato" && !dateRegex.test(uniqueValues[0])) {
+                statusHTML = `<span class="fail">Feil datoformat</span>`;
+                errors++;
+            } else {
+                statusHTML = `<span class="pass">OK: ${valueDisplay}</span>`;
+                samsvarHTML = `<span class="pass">100% samsvar</span>`;
+            }
+
+            body.innerHTML += `<tr><td>${k}</td><td>${statusHTML}</td><td>${samsvarHTML}</td></tr>`;
+        });
+
+        summary.innerHTML = `<div class="warning-box" style="background:${errors===0?'#f4fce3':'#fff4e6'}; border-color:${errors===0?'#b2f2bb':'#ffd8a8'}; color:${errors===0?'#2b8a3e':'#d9480f'}">
+            Sjekket ${total} objekter i "${filename}". ${errors === 0 ? "Alle objekter har identiske og korrekte metadata." : `Fant ${errors} kritiske avvik i modellen.`}
+        </div>`;
+
+        title.innerHTML = errors === 0 ? "✅ Modellen er validert" : "❌ Modellen har metadata-avvik";
         resultCard.style.display = 'block';
-        dropText.innerText = "Sjekk fullført for " + filename;
     }
 </script>
 
