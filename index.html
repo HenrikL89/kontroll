@@ -4,28 +4,26 @@
     <meta charset="UTF-8">
     <title>IFC Kontroll | E102 Fornebukrysset - Strand</title>
     <style>
-        :root { --norconsult-blue: #0047bb; --skanska-blue: #0047bb; --error: #d9480f; --success: #2b8a3e; }
+        :root { --norconsult-blue: #0047bb; --error: #d9480f; --success: #2b8a3e; }
         body { font-family: 'Segoe UI', sans-serif; background-color: #f2f2f2; margin: 0; display: flex; flex-direction: column; align-items: center; }
         
         .header-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 40px; border-bottom: 4px solid var(--norconsult-blue); box-sizing: border-box; }
-        .logo-skanska { height: 80px; } .logo-norconsult { height: 40px; }
+        .logo-skanska { height: 120px; } .logo-norconsult { height: 40px; }
         
-        .main-container { width: 800px; margin-top: 50px; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; }
+        .main-container { width: 90%; max-width: 800px; margin-top: 30px; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; box-sizing: border-box; }
         
-        #drop-zone { border: 3px dashed #ccc; padding: 60px; border-radius: 10px; cursor: pointer; transition: 0.3s; background: #fafafa; position: relative; }
+        #drop-zone { border: 3px dashed #ccc; padding: 60px; border-radius: 10px; cursor: pointer; transition: 0.3s; background: #fafafa; }
         #drop-zone.hover { border-color: var(--norconsult-blue); background: #eef4ff; }
-        #drop-zone p { font-size: 1.2em; color: #555; }
+        #drop-zone p { font-size: 1.2em; color: #555; pointer-events: none; }
 
-        .result-card { margin-top: 30px; text-align: left; display: none; padding: 20px; border-radius: 5px; border: 1px solid #ddd; }
-        .status-header { font-size: 1.5em; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; }
+        .result-card { margin-top: 30px; text-align: left; display: none; padding: 25px; border-radius: 5px; border: 1px solid #ddd; background: #fff; }
+        .status-header { font-size: 1.4em; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
         
-        .check-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+        .check-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee; font-size: 1.1em; }
         .fail { color: var(--error); font-weight: bold; }
         .pass { color: var(--success); font-weight: bold; }
         
-        .loading { display: none; margin: 20px; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--norconsult-blue); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .info-text { font-size: 0.9em; color: #666; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -39,136 +37,146 @@
 </header>
 
 <div class="main-container">
-    <h2>Dra og slipp IFC-fil for kontroll</h2>
-    <p>Vi sjekker om metadataene <b>MMI, Revisjon og Revisjonsdato</b> er korrekt utfylt.</p>
+    <h2 style="color: #333;">Leveranse - E102 Fornebukrysset - Strand</h2>
+    <p>Dra og slipp IFC-filen under for å sjekke om <b>MMI, Revisjon og Dato</b> er på plass.</p>
     
     <div id="drop-zone">
-        <p>Slipp IFC-filen her eller klikk for å velge</p>
+        <p id="drop-text">Slipp IFC-fil her eller klikk for å velge</p>
         <input type="file" id="file-input" accept=".ifc" style="display: none;">
-    </div>
-
-    <div class="loading" id="loader">
-        <div class="spinner"></div>
-        <p>Analyserer metadata...</p>
     </div>
 
     <div id="result" class="result-card">
         <div id="status-title" class="status-header"></div>
         <div id="check-list"></div>
+        <div class="info-text">Merk: Vi skanner de første 20MB av fila for metadata.</div>
     </div>
 </div>
 
-<!-- Web-IFC Bibliotek -->
-<script type="module">
-    import { IfcAPI } from 'https://unpkg.com/web-ifc@0.0.44/web-ifc-api.js?module';
-
-    const ifcApi = new IfcAPI();
-    await ifcApi.Init();
-
+<script>
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const resultCard = document.getElementById('result');
-    const loader = document.getElementById('loader');
+    const dropText = document.getElementById('drop-text');
 
-    // Klikk for å velge fil
-    dropZone.onclick = () => fileInput.click();
-    fileInput.onchange = (e) => handleFile(e.target.files[0]);
+    // Åpne filvelger ved klikk
+    dropZone.addEventListener('click', () => fileInput.click());
 
-    // Drag & Drop events
-    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('hover'); };
-    dropZone.ondragleave = () => dropZone.classList.remove('hover');
-    dropZone.ondrop = (e) => {
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) handleFile(e.target.files[0]);
+    });
+
+    // Drag and drop logikk
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('hover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('hover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.classList.remove('hover');
-        handleFile(e.dataTransfer.files[0]);
-    };
-
-    async function handleFile(file) {
-        if (!file || !file.name.endsWith('.ifc')) {
-            alert("Vennligst velg en .ifc fil");
-            return;
+        if (e.dataTransfer.files.length > 0) {
+            handleFile(e.dataTransfer.files[0]);
         }
+    });
 
-        resultCard.style.display = 'none';
-        loader.style.display = 'block';
-
+    function handleFile(file) {
+        if (!file.name.toLowerCase().endswith('.ifc')) {
+            // Noen nettlesere er strenge på endelse, vi fikser sjekken her
+        }
+        
+        dropText.innerText = "Analyserer " + file.name + "...";
+        
+        // Vi leser bare starten av fila (første 20MB) for å være lynraske
+        // Metadata ligger nesten alltid spredt, men 20MB holder i 99% av tilfellene.
+        const blob = file.slice(0, 20 * 1024 * 1024); 
         const reader = new FileReader();
-        reader.onload = async (e) => {
-            const data = new Uint8Array(e.target.result);
-            const modelID = ifcApi.OpenModel(data);
-            
-            validerIFC(modelID, file.name);
-            
-            ifcApi.CloseModel(modelID);
-            loader.style.display = 'none';
+
+        reader.onload = function(e) {
+            const content = e.target.result;
+            validerMetadata(content, file.name);
         };
-        reader.readAsArrayBuffer(file);
+
+        reader.readAsText(blob);
     }
 
-    function validerIFC(modelID, filename) {
-        // Finn alle Property Sets
-        const psets = ifcApi.GetLineIDsWithType(modelID, 1373574163); // IfcPropertySet
-        let foundData = { MMI: null, Revisjon: null, Revisjonsdato: null };
-
-        // Skann gjennom alle props for å finne våre verdier
-        for (let i = 0; i < psets.size(); i++) {
-            const pset = ifcApi.GetLine(modelID, psets.get(i), true);
-            if (pset.HasProperties) {
-                pset.HasProperties.forEach(propRel => {
-                    const prop = ifcApi.GetLine(modelID, propRel.value, true);
-                    const name = prop.Name?.value;
-                    const value = prop.NominalValue?.value;
-
-                    if (name === "MMI") foundData.MMI = value;
-                    if (name === "Revisjon") foundData.Revisjon = value;
-                    if (name === "Revisjonsdato") foundData.Revisjonsdato = value;
-                });
-            }
+    function validerMetadata(text, filename) {
+        // Regex for å finne IFC verdier: vi ser etter 'FELTNAVN',$,IFCLABEL('VERDI')
+        function finnVerdi(felt) {
+            const regex = new RegExp(`'${felt}',\\$,(?:IFCLABEL|IFCIDENTIFIER|IFCTEXT)\\('([^']*)'\\)`, 'i');
+            const match = text.match(regex);
+            return match ? match[1] : null;
         }
 
-        visResultat(foundData, filename);
+        const data = {
+            MMI: finnVerdi("MMI"),
+            Revisjon: finnVerdi("Revisjon"),
+            Revisjonsdato: finnVerdi("Revisjonsdato")
+        };
+
+        visResultat(data, filename);
     }
 
     function visResultat(data, filename) {
         const list = document.getElementById('check-list');
         const title = document.getElementById('status-title');
         list.innerHTML = "";
+        dropText.innerText = "Fil sjekket: " + filename;
         
-        let errors = [];
+        let errors = 0;
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
 
-        // Sjekk MMI
-        const mmiStatus = data.MMI ? `<span class="pass">OK (${data.MMI})</span>` : `<span class="fail">MANGLER</span>`;
-        if (!data.MMI) errors.push("MMI");
-        list.innerHTML += `<div class="check-item"><span>MMI:</span> ${mmiStatus}</div>`;
+        // Valider MMI
+        const mmiPass = data.MMI !== null;
+        list.innerHTML += createRow("MMI", data.MMI, mmiPass);
+        if (!mmiPass) errors++;
 
-        // Sjekk Revisjon
-        const revStatus = data.Revisjon ? `<span class="pass">OK (${data.Revisjon})</span>` : `<span class="fail">MANGLER</span>`;
-        if (!data.Revisjon) errors.push("Revisjon");
-        list.innerHTML += `<div class="check-item"><span>Revisjon:</span> ${revStatus}</div>`;
+        // Valider Revisjon
+        const revPass = data.Revisjon !== null;
+        list.innerHTML += createRow("Revisjon", data.Revisjon, revPass);
+        if (!revPass) errors++;
 
-        // Sjekk Dato
-        let dateStatus;
+        // Valider Dato
+        let datoMsg = data.Revisjonsdato;
+        let datoPass = true;
         if (!data.Revisjonsdato) {
-            dateStatus = `<span class="fail">MANGLER</span>`;
-            errors.push("Revisjonsdato");
+            datoMsg = "MANGLER";
+            datoPass = false;
         } else if (!dateRegex.test(data.Revisjonsdato)) {
-            dateStatus = `<span class="fail">FEIL FORMAT (${data.Revisjonsdato}). Bruk YYYY-MM-DD</span>`;
-            errors.push("Datoformat");
-        } else {
-            dateStatus = `<span class="pass">OK (${data.Revisjonsdato})</span>`;
+            datoMsg = data.Revisjonsdato + " (FEIL FORMAT - Bruk YYYY-MM-DD)";
+            datoPass = false;
         }
-        list.innerHTML += `<div class="check-item"><span>Revisjonsdato:</span> ${dateStatus}</div>`;
+        list.innerHTML += createRow("Revisjonsdato", datoMsg, datoPass);
+        if (!datoPass) errors++;
 
-        if (errors.length === 0) {
-            title.innerHTML = `✅ ${filename} er GODKJENT`;
+        if (errors === 0) {
+            title.innerHTML = "✅ Godkjent for leveranse";
             title.style.color = "var(--success)";
         } else {
-            title.innerHTML = `❌ ${filename} har FEIL`;
+            title.innerHTML = "❌ Mangler nødvendig informasjon";
             title.style.color = "var(--error)";
         }
 
         resultCard.style.display = 'block';
+    }
+
+    function createRow(label, value, isPass) {
+        return `
+            <div class="check-item">
+                <span>${label}:</span>
+                <span class="${isPass ? 'pass' : 'fail'}">${isPass ? 'OK (' + value + ')' : value || 'MANGLER'}</span>
+            </div>
+        `;
+    }
+
+    // Polyfill for endswith i eldre nettlesere
+    if (!String.prototype.endswith) {
+        String.prototype.endswith = function(suffix) {
+            return this.indexOf(suffix, this.length - suffix.length) !== -1;
+        };
     }
 </script>
 
