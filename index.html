@@ -67,8 +67,7 @@
 </div>
 
 <script>
-    // KRAV-listen er oppdatert (FDV og NVDB er fjernet)
-    const KRAV =[
+    const KRAV = [
         "Entreprise", "Fagkode", "Firmanavn", "Godkjent av", 
         "Kontrollert av", "MMI", "Objektkode V770", "PNS", 
         "Prosjektnavn", "Revisjon", "Revisjonsdato"
@@ -126,7 +125,7 @@
         
         let feilAntall = 0;
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
-        const objKodeRegex = /\d{8}/; // Leter etter 8 sammenhengende tall
+        const objektkodeRegex = /^\d{8}$/; // Nøyaktig 8 siffer
 
         KRAV.forEach(k => {
             const verdier = Array.from(funn[k]);
@@ -134,29 +133,47 @@
             let infoHTML = "";
             let isError = false;
 
+            // 1. Sjekk om egenskapen mangler helt
             if (verdier.length === 0) {
                 statusHTML = `<span class="fail">MANGLER</span>`;
                 infoHTML = `Egenskapen ble ikke funnet i fila.`;
                 isError = true;
-            } else if (verdier.length > 1) {
+            } 
+            // 2. Sjekk for inkonsistente verdier (unntatt Objektkode V770)
+            else if (verdier.length > 1 && k !== "Objektkode V770") {
                 statusHTML = `<span class="fail">INKONSISTENT</span>`;
                 infoHTML = `Funnet flere ulike verdier: ${verdier.join(", ")}`;
                 isError = true;
-            } else {
-                const v = verdier[0];
+            } 
+            else {
+                const v = verdier[0]; // Referanseverdi for standard-sjekker
                 
-                // SPESIFIKK SJEKK: Kontrollert av (Må være ThSel)
-                if (k === "Kontrollert av") {
+                // SPESIFIKK SJEKK: Godkjent av
+                if (k === "Godkjent av") {
                     if (v !== "ThSel") {
                         statusHTML = `<span class="fail">FEIL VERDI: ${v}</span>`;
-                        infoHTML = `Påkrevd kontrollør: ThSel`;
+                        infoHTML = `Påkrevd godkjenner: ThSel`;
                         isError = true;
                     } else {
                         statusHTML = `<span class="pass">OK: ${v}</span>`;
-                        infoHTML = `Godkjent kontrollør.`;
+                        infoHTML = `Godkjent verdi.`;
                     }
                 } 
-                // SPESIFIKK SJEKK: Revisjonsdato (Format YYYY-MM-DD)
+                // SPESIFIKK SJEKK: Objektkode V770 (Sjekker ALLE verdier som er funnet)
+                else if (k === "Objektkode V770") {
+                    const ugyldigeKoder = verdier.filter(kode => !objektkodeRegex.test(kode));
+                    
+                    if (ugyldigeKoder.length > 0) {
+                        statusHTML = `<span class="fail">FEIL FORMAT: ${ugyldigeKoder.join(", ")}</span>`;
+                        infoHTML = `Alle objektkoder må inneholde nøyaktig 8 siffer.`;
+                        isError = true;
+                    } else {
+                        statusHTML = `<span class="pass">OK (${verdier.length} koder)</span>`;
+                        infoHTML = `Alle funne koder er gyldige: ${verdier.join(", ")}`;
+                        isError = false;
+                    }
+                }
+                // SPESIFIKK SJEKK: Revisjonsdato
                 else if (k === "Revisjonsdato") {
                     if (!dateRegex.test(v)) {
                         statusHTML = `<span class="fail">FEIL FORMAT: ${v}</span>`;
@@ -166,19 +183,8 @@
                         statusHTML = `<span class="pass">OK: ${v}</span>`;
                         infoHTML = `Korrekt datoformat.`;
                     }
-                }
-                // SPESIFIKK SJEKK: Objektkode V770 (Må inneholde 8-sifret tall)
-                else if (k === "Objektkode V770") {
-                    if (!objKodeRegex.test(v)) {
-                        statusHTML = `<span class="fail">FEIL VERDI: ${v}</span>`;
-                        infoHTML = `Må inneholde et 8-sifret tall.`;
-                        isError = true;
-                    } else {
-                        statusHTML = `<span class="pass">OK: ${v}</span>`;
-                        infoHTML = `Inneholder gyldig kode.`;
-                    }
-                }
-                // STANDARD SJEKK:
+                } 
+                // STANDARD SJEKK FOR RESTEN
                 else {
                     statusHTML = `<span class="pass">OK: ${v}</span>`;
                     infoHTML = `Verdi bekreftet.`;
@@ -200,7 +206,7 @@
 
         summary.className = feilAntall === 0 ? "summary-box summary-pass" : "summary-box summary-fail";
         summary.innerHTML = feilAntall === 0 
-            ? `✅ Modellen "${filename}" er godkjent.` 
+            ? `✅ Modellen "${filename}" er kontrollert og godkjent.` 
             : `❌ Modellen "${filename}" har ${feilAntall} avvik.`;
 
         title.innerHTML = feilAntall === 0 ? "Godkjent for leveranse" : "Avvik funnet i metadata";
