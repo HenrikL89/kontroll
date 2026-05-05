@@ -35,7 +35,7 @@
         .summary-fail { background: #fff5f5; border: 1px solid #ffa8a8; color: #c92a2a; }
         .summary-pass { background: #f4fce3; border: 1px solid #b2f2bb; color: #2b8a3e; }
         
-        small { display: block; color: #666; margin-top: 4px; line-height: 1.4; }
+        small { display: block; color: #666; margin-top: 4px; line-height: 1.4; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -55,7 +55,7 @@
             <b id="loader-text">Analyserer filstruktur...</b>
         </div>
         <p id="drop-instruction" style="font-size: 1.3em; color: #444;">Dra og slipp IFC-fil her for kontroll</p>
-        <p style="color: #888;">Støtter norske tegn (ÆØÅ) og multi-verdi validering.</p>
+        <p style="color: #888;">Full dekoding av norske tegn (ÆØÅ) og PNS-validering.</p>
         <input type="file" id="file-input" accept=".ifc" style="display: none;">
     </div>
 
@@ -100,6 +100,30 @@
         handleFile(e.dataTransfer.files[0]);
     };
 
+    // Hjelpefunksjon for å dekode IFC-spesifikke tegnkoder
+    function decodeIFCString(str) {
+        if (!str) return "";
+        
+        let decoded = str;
+        // Dekod Unicode-sekvenser (f.eks \X2\00D8\X0\ som er Ø)
+        decoded = decoded.replace(/\\X2\\([0-9A-F]{4})\\X0\\/g, (match, hex) => {
+            return String.fromCharCode(parseInt(hex, 16));
+        });
+        
+        // Dekod ISO-snarveier vanlige i IFC
+        const isoMap = {
+            '\\O\\': 'Ø', '\\o\\': 'ø',
+            '\\A\\': 'Å', '\\a\\': 'å',
+            '\\E\\': 'Æ', '\\e\\': 'æ'
+        };
+        
+        Object.keys(isoMap).forEach(key => {
+            decoded = decoded.split(key).join(isoMap[key]);
+        });
+
+        return decoded;
+    }
+
     function handleFile(file) {
         if (!file) return;
 
@@ -116,8 +140,8 @@
                 fileInput.value = ""; 
             }, 100);
         };
-        // Leser filen som UTF-8 for å støtte ÆØÅ korrekt
-        reader.readAsText(file, "UTF-8");
+        // Bruker ISO-8859-1 for å fange opp eldre IFC-kodinger som standard
+        reader.readAsText(file, "ISO-8859-1");
     }
 
     function analyserTekst(text, filename) {
@@ -129,8 +153,8 @@
         
         let match;
         while ((match = regex.exec(text)) !== null) {
-            const propName = match[1];
-            const propValue = match[2];
+            const propName = decodeIFCString(match[1]);
+            const propValue = decodeIFCString(match[2]);
             
             if (KRAV.includes(propName)) {
                 if (propValue.trim() !== "") {
@@ -150,7 +174,7 @@
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/; 
         const objektkodeRegex = /^\d{8}$/; 
         
-        // Regex for PNS validering (Case insensitive sjekk av kodene)
+        // Støtter norske tegn i sjekken
         const pnsRegex = /(DSS|FBX|GTS|HTØ|VLG|FEL|DNS)/i;
 
         KRAV.forEach(k => {
@@ -179,7 +203,7 @@
                         infoHTML = `Påkrevd godkjenner: ThSel. Funnet ugyldig: ${ugyldige.join(", ")}`;
                         isError = true;
                     } else {
-                        statusHTML = `<span class="pass">OK (${verdier.length} verdier)</span>`;
+                        statusHTML = `<span class="pass">OK</span>`;
                         infoHTML = `Godkjent av: ${verdier.join(", ")}`;
                     }
                 } 
@@ -190,8 +214,8 @@
                         infoHTML = `Alle datoer må følge YYYY-MM-DD. Funnet feil: ${ugyldigeDatoer.join(", ")}`;
                         isError = true;
                     } else {
-                        statusHTML = `<span class="pass">OK (${verdier.length} datoer)</span>`;
-                        infoHTML = `Alle datoer har korrekt format: ${verdier.join(", ")}`;
+                        statusHTML = `<span class="pass">OK</span>`;
+                        infoHTML = `Datoer: ${verdier.join(", ")}`;
                     }
                 }
                 else if (k === "Objektkode V770") {
@@ -201,29 +225,28 @@
                         infoHTML = `Alle koder må være 8 siffer. Funnet feil: ${ugyldigeKoder.join(", ")}`;
                         isError = true;
                     } else {
-                        statusHTML = `<span class="pass">OK (${verdier.length} koder)</span>`;
-                        infoHTML = `Alle koder er gyldige: ${verdier.join(", ")}`;
+                        statusHTML = `<span class="pass">OK</span>`;
+                        infoHTML = `Funnet koder: ${verdier.join(", ")}`;
                     }
                 }
                 else if (k === "PNS") {
-                    // Bruker den nye Regex-sjekken her
                     const ugyldigePNS = verdier.filter(v => !pnsRegex.test(v));
-                    
                     if (ugyldigePNS.length > 0) {
                         statusHTML = `<span class="fail">UGYLDIG KODE</span>`;
                         infoHTML = `PNS må inneholde en av: DSS, FBX, GTS, HTØ, VLG, FEL, DNS. Funnet ugyldig: ${ugyldigePNS.join(", ")}`;
                         isError = true;
                     } else {
-                        statusHTML = `<span class="pass">OK (${verdier.length} verdier)</span>`;
-                        infoHTML = `Alle verdier inneholder godkjente koder: ${verdier.join(", ")}`;
+                        statusHTML = `<span class="pass">OK</span>`;
+                        infoHTML = `Inneholder godkjente koder: ${verdier.join(", ")}`;
                     }
                 }
                 else if (allowMultiple.includes(k)) {
-                    statusHTML = `<span class="pass">OK (${verdier.length} verdier)</span>`;
+                    statusHTML = `<span class="pass">OK</span>`;
                     infoHTML = `Verdier funnet: ${verdier.join(", ")}`;
                 }
                 else {
-                    statusHTML = `<span class="pass">OK: ${verdier[0]}</span>`;
+                    statusHTML = `<span class="pass">OK</span>`;
+                    infoHTML = `Verdi: ${verdier[0]}`;
                 }
             }
 
