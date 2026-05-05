@@ -55,7 +55,7 @@
             <b id="loader-text">Analyserer filstruktur...</b>
         </div>
         <p id="drop-instruction" style="font-size: 1.3em; color: #444;">Dra og slipp IFC-fil her for kontroll</p>
-        <p style="color: #888;">Støtter multi-MMI og case-insensitive godkjenning.</p>
+        <p style="color: #888;">Støtter norske tegn (ÆØÅ) og multi-verdi validering.</p>
         <input type="file" id="file-input" accept=".ifc" style="display: none;">
     </div>
 
@@ -116,13 +116,15 @@
                 fileInput.value = ""; 
             }, 100);
         };
-        reader.readAsText(file);
+        // Leser filen som UTF-8 for å støtte ÆØÅ korrekt
+        reader.readAsText(file, "UTF-8");
     }
 
     function analyserTekst(text, filename) {
         let funn = {};
         KRAV.forEach(k => funn[k] = new Set());
 
+        // Regex for å finne IFC verdier
         const regex = /IFCPROPERTYSINGLEVALUE\s*\(\s*'([^']+)'\s*,\s*\$\s*,\s*[A-Z]+\s*\(\s*'([^']*)'\s*\)/g;
         
         let match;
@@ -147,7 +149,9 @@
         let feilAntall = 0;
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/; 
         const objektkodeRegex = /^\d{8}$/; 
-        const godkjentePNS = ["DSS", "FBX", "GTS", "HTØ", "VLG", "FEL", "DNS"];
+        
+        // Regex for PNS validering (Case insensitive sjekk av kodene)
+        const pnsRegex = /(DSS|FBX|GTS|HTØ|VLG|FEL|DNS)/i;
 
         KRAV.forEach(k => {
             const verdier = Array.from(funn[k]);
@@ -155,7 +159,6 @@
             let infoHTML = "";
             let isError = false;
 
-            // Felter som tillater flere ulike verdier uten å krasje
             const allowMultiple = ["Objektkode V770", "Kontrollert av", "Revisjon", "Revisjonsdato", "PNS", "MMI", "Godkjent av"];
 
             if (verdier.length === 0) {
@@ -170,7 +173,6 @@
             } 
             else {
                 if (k === "Godkjent av") {
-                    // Sjekker alle funne verdier case-insensitive
                     const ugyldige = verdier.filter(v => v.toLowerCase() !== "thsel");
                     if (ugyldige.length > 0) {
                         statusHTML = `<span class="fail">FEIL VERDI</span>`;
@@ -204,10 +206,12 @@
                     }
                 }
                 else if (k === "PNS") {
-                    const ugyldigePNS = verdier.filter(v => !godkjentePNS.some(kode => v.toUpperCase().includes(kode)));
+                    // Bruker den nye Regex-sjekken her
+                    const ugyldigePNS = verdier.filter(v => !pnsRegex.test(v));
+                    
                     if (ugyldigePNS.length > 0) {
                         statusHTML = `<span class="fail">UGYLDIG KODE</span>`;
-                        infoHTML = `PNS må inneholde en av: ${godkjentePNS.join(", ")}. Funnet ugyldig: ${ugyldigePNS.join(", ")}`;
+                        infoHTML = `PNS må inneholde en av: DSS, FBX, GTS, HTØ, VLG, FEL, DNS. Funnet ugyldig: ${ugyldigePNS.join(", ")}`;
                         isError = true;
                     } else {
                         statusHTML = `<span class="pass">OK (${verdier.length} verdier)</span>`;
