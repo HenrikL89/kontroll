@@ -55,7 +55,7 @@
             <b id="loader-text">Analyserer filstruktur...</b>
         </div>
         <p id="drop-instruction" style="font-size: 1.3em; color: #444;">Dra og slipp IFC-fil her for kontroll</p>
-        <p style="color: #888;">Støtter flere revisjoner, objektkoder og PNS-validering.</p>
+        <p style="color: #888;">Støtter multi-MMI og case-insensitive godkjenning.</p>
         <input type="file" id="file-input" accept=".ifc" style="display: none;">
     </div>
 
@@ -147,8 +147,6 @@
         let feilAntall = 0;
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/; 
         const objektkodeRegex = /^\d{8}$/; 
-        
-        // Godkjente koder for PNS
         const godkjentePNS = ["DSS", "FBX", "GTS", "HTØ", "VLG", "FEL", "DNS"];
 
         KRAV.forEach(k => {
@@ -157,7 +155,8 @@
             let infoHTML = "";
             let isError = false;
 
-            const allowMultiple = ["Objektkode V770", "Kontrollert av", "Revisjon", "Revisjonsdato", "PNS"];
+            // Felter som tillater flere ulike verdier uten å krasje
+            const allowMultiple = ["Objektkode V770", "Kontrollert av", "Revisjon", "Revisjonsdato", "PNS", "MMI", "Godkjent av"];
 
             if (verdier.length === 0) {
                 statusHTML = `<span class="fail">MANGLER</span>`;
@@ -171,12 +170,15 @@
             } 
             else {
                 if (k === "Godkjent av") {
-                    if (verdier[0] !== "ThSel") {
-                        statusHTML = `<span class="fail">FEIL VERDI: ${verdier[0]}</span>`;
-                        infoHTML = `Påkrevd godkjenner: ThSel`;
+                    // Sjekker alle funne verdier case-insensitive
+                    const ugyldige = verdier.filter(v => v.toLowerCase() !== "thsel");
+                    if (ugyldige.length > 0) {
+                        statusHTML = `<span class="fail">FEIL VERDI</span>`;
+                        infoHTML = `Påkrevd godkjenner: ThSel. Funnet ugyldig: ${ugyldige.join(", ")}`;
                         isError = true;
                     } else {
-                        statusHTML = `<span class="pass">OK: ThSel</span>`;
+                        statusHTML = `<span class="pass">OK (${verdier.length} verdier)</span>`;
+                        infoHTML = `Godkjent av: ${verdier.join(", ")}`;
                     }
                 } 
                 else if (k === "Revisjonsdato") {
@@ -202,9 +204,7 @@
                     }
                 }
                 else if (k === "PNS") {
-                    // Sjekker at hver PNS-verdi inneholder minst én av de godkjente kodene
                     const ugyldigePNS = verdier.filter(v => !godkjentePNS.some(kode => v.toUpperCase().includes(kode)));
-                    
                     if (ugyldigePNS.length > 0) {
                         statusHTML = `<span class="fail">UGYLDIG KODE</span>`;
                         infoHTML = `PNS må inneholde en av: ${godkjentePNS.join(", ")}. Funnet ugyldig: ${ugyldigePNS.join(", ")}`;
@@ -238,7 +238,7 @@
 
         summary.className = feilAntall === 0 ? "summary-box summary-pass" : "summary-box summary-fail";
         summary.innerHTML = feilAntall === 0 
-            ? `✅ Modellen "${filename}" er godkjent.` 
+            ? `✅ Modellen "${filename}" er kontrollert og godkjent.` 
             : `❌ Modellen "${filename}" har ${feilAntall} avvik.`;
 
         title.innerHTML = feilAntall === 0 ? "Godkjent for leveranse" : "Avvik funnet i metadata";
