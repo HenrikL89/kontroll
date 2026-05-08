@@ -2,20 +2,24 @@
 <html lang="no">
 <head>
     <meta charset="UTF-8">
-    <title>Leveranser - E102 Fornebukrysset - Strand</title>
+    <title>Kontroll av IFC leveranser - E102 Fornebukrysset - Strand</title>
     <style>
         :root { --nc-blue: #0047bb; --err: #d9480f; --ok: #2b8a3e; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f2f2f2; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f2f2f2; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
         
+        /* Header med Skanska (3x) og Norconsult logo */
         .header-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 40px; border-bottom: 4px solid var(--nc-blue); box-sizing: border-box; min-height: 160px; }
         .logo-skanska { height: 150px; } .logo-norconsult { height: 50px; }
         .logo-wrapper { display: flex; align-items: center; gap: 30px; }
         
-        .main-container { width: 95%; max-width: 900px; margin: 30px 0; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .header-bar h1 { color: var(--nc-blue); font-size: 1.4em; text-transform: uppercase; margin: 0; max-width: 50%; }
+
+        .main-container { width: 95%; max-width: 950px; margin: 30px 0; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); flex-grow: 1; }
         
         #drop-zone { border: 3px dashed #ccc; padding: 60px; border-radius: 10px; cursor: pointer; text-align: center; background: #fafafa; transition: 0.2s; position: relative; }
         #drop-zone.hover { border-color: var(--nc-blue); background: #eef4ff; }
         
+        /* Laste-animasjon */
         .loader-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); border-radius: 10px; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--nc-blue); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 10px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -35,13 +39,15 @@
         .summary-fail { background: #fff5f5; border: 1px solid #ffa8a8; color: #c92a2a; }
         .summary-pass { background: #f4fce3; border: 1px solid #b2f2bb; color: #2b8a3e; }
         
+        footer { width: 100%; padding: 20px 0; text-align: center; color: #666; font-size: 0.9em; background: #e9ecef; border-top: 1px solid #dee2e6; }
+        
         small { display: block; color: #666; margin-top: 4px; line-height: 1.4; word-break: break-all; }
     </style>
 </head>
 <body>
 
 <header class="header-bar">
-    <h1 style="color: var(--nc-blue); font-size: 1.2em; text-transform: uppercase;">Leveranser - E102 Fornebukrysset - Strand</h1>
+    <h1>Kontroll av IFC leveranser - E102 Fornebukrysset - Strand</h1>
     <div class="logo-wrapper">
         <img src="https://download.logo.wine/logo/Skanska/Skanska-Logo.wine.png" alt="Skanska" class="logo-skanska">
         <img src="https://companieslogo.com/img/orig/NORCO.OL_BIG-2216a709.png?t=1721396473" alt="Norconsult" class="logo-norconsult">
@@ -55,6 +61,7 @@
             <b id="loader-text">Analyserer filstruktur...</b>
         </div>
         <p id="drop-instruction" style="font-size: 1.3em; color: #444;">Dra og slipp IFC-fil her for kontroll</p>
+        <p style="color: #888;">Metadata sjekkes mot prosjektets kravspesifikasjon.</p>
         <input type="file" id="file-input" accept=".ifc" style="display: none;">
     </div>
 
@@ -74,6 +81,10 @@
         </table>
     </div>
 </div>
+
+<footer>
+    Laget av Henrik Lien
+</footer>
 
 <script>
     const KRAV = [
@@ -99,31 +110,15 @@
         handleFile(e.dataTransfer.files[0]);
     };
 
-    // DEKODER FOR IFC-SPESIFIKKE TEGNKODER
     function decodeIFCString(str) {
         if (!str) return "";
         let decoded = str;
-
-        // 1. Dekod 8-bits koding (f.eks \X\D8 for Ø) - DETTE ER FIXEN
-        decoded = decoded.replace(/\\X\\([0-9A-F]{2})/g, (match, hex) => {
-            return String.fromCharCode(parseInt(hex, 16));
-        });
-
-        // 2. Dekod 16-bits koding (\X2\00D8\X0\ for Ø)
-        decoded = decoded.replace(/\\X2\\([0-9A-F]{4})\\X0\\/g, (match, hex) => {
-            return String.fromCharCode(parseInt(hex, 16));
-        });
-        
-        // 3. Dekod ISO-snarveier
-        const isoMap = {
-            '\\O\\': 'Ø', '\\o\\': 'ø',
-            '\\A\\': 'Å', '\\a\\': 'å',
-            '\\E\\': 'Æ', '\\e\\': 'æ'
-        };
-        Object.keys(isoMap).forEach(key => {
-            decoded = decoded.split(key).join(isoMap[key]);
-        });
-
+        // 8-bit hex koding (\X\D8 -> Ø)
+        decoded = decoded.replace(/\\X\\([0-9A-F]{2})/g, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+        // 16-bit unicode (\X2\00D8\X0\ -> Ø)
+        decoded = decoded.replace(/\\X2\\([0-9A-F]{4})\\X0\\/g, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+        const isoMap = { '\\O\\': 'Ø', '\\o\\': 'ø', '\\A\\': 'Å', '\\a\\': 'å', '\\E\\': 'Æ', '\\e\\': 'æ' };
+        Object.keys(isoMap).forEach(key => { decoded = decoded.split(key).join(isoMap[key]); });
         return decoded;
     }
 
@@ -132,7 +127,6 @@
         resultCard.style.display = 'none';
         loader.style.display = 'flex';
         loaderText.innerText = "Dekoder og analyserer " + file.name + "...";
-
         const reader = new FileReader();
         reader.onload = (e) => {
             const content = e.target.result;
@@ -148,18 +142,13 @@
     function analyserTekst(text, filename) {
         let funn = {};
         KRAV.forEach(k => funn[k] = new Set());
-
         const regex = /IFCPROPERTYSINGLEVALUE\s*\(\s*'([^']+)'\s*,\s*\$\s*,\s*[A-Z]+\s*\(\s*'([^']*)'\s*\)/g;
-        
         let match;
         while ((match = regex.exec(text)) !== null) {
             const propName = decodeIFCString(match[1]);
             const propValue = decodeIFCString(match[2]);
-            
-            if (KRAV.includes(propName)) {
-                if (propValue.trim() !== "") {
-                    funn[propName].add(propValue.trim());
-                }
+            if (KRAV.includes(propName) && propValue.trim() !== "") {
+                funn[propName].add(propValue.trim());
             }
         }
         visResultat(funn, filename);
@@ -169,7 +158,6 @@
         const title = document.getElementById('status-title');
         const summary = document.getElementById('summary-msg');
         body.innerHTML = "";
-        
         let feilAntall = 0;
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/; 
         const objektkodeRegex = /^\d{8}$/; 
@@ -177,79 +165,56 @@
 
         KRAV.forEach(k => {
             const verdier = Array.from(funn[k]);
-            let statusHTML = "";
-            let infoHTML = "";
-            let isError = false;
-
+            let statusHTML = "", infoHTML = "", isError = false;
             const allowMultiple = ["Objektkode V770", "Kontrollert av", "Revisjon", "Revisjonsdato", "PNS", "MMI", "Godkjent av"];
 
             if (verdier.length === 0) {
                 statusHTML = `<span class="fail">MANGLER</span>`;
-                infoHTML = `Egenskapen ble ikke funnet i fila.`;
                 isError = true;
-            } 
-            else if (verdier.length > 1 && !allowMultiple.includes(k)) {
+            } else if (verdier.length > 1 && !allowMultiple.includes(k)) {
                 statusHTML = `<span class="fail">INKONSISTENT</span>`;
-                infoHTML = `Funnet flere ulike verdier: ${verdier.join(", ")}`;
+                infoHTML = `Flere ulike verdier funnet: ${verdier.join(", ")}`;
                 isError = true;
-            } 
-            else {
+            } else {
                 if (k === "Godkjent av") {
                     const ugyldige = verdier.filter(v => v.toLowerCase() !== "thsel");
                     if (ugyldige.length > 0) {
                         statusHTML = `<span class="fail">FEIL VERDI</span>`;
                         infoHTML = `Påkrevd: ThSel. Funnet: ${ugyldige.join(", ")}`;
                         isError = true;
-                    } else { statusHTML = `<span class="pass">OK</span>`; infoHTML = `Verdi: ${verdier.join(", ")}`; }
-                } 
-                else if (k === "Revisjonsdato") {
-                    const ugyldigeDatoer = verdier.filter(d => !dateRegex.test(d));
-                    if (ugyldigeDatoer.length > 0) {
+                    } else { statusHTML = `<span class="pass">OK</span>`; infoHTML = `Godkjent av: ${verdier.join(", ")}`; }
+                } else if (k === "Revisjonsdato") {
+                    const ugyldige = verdier.filter(d => !dateRegex.test(d));
+                    if (ugyldige.length > 0) {
                         statusHTML = `<span class="fail">FEIL FORMAT</span>`;
-                        infoHTML = `Må være YYYY-MM-DD. Feil funnet: ${ugyldigeDatoer.join(", ")}`;
+                        infoHTML = `Format YYYY-MM-DD påkrevd. Feil: ${ugyldige.join(", ")}`;
                         isError = true;
                     } else { statusHTML = `<span class="pass">OK</span>`; infoHTML = `Datoer: ${verdier.join(", ")}`; }
-                }
-                else if (k === "Objektkode V770") {
-                    const ugyldigeKoder = verdier.filter(c => !objektkodeRegex.test(c));
-                    if (ugyldigeKoder.length > 0) {
+                } else if (k === "Objektkode V770") {
+                    const ugyldige = verdier.filter(c => !objektkodeRegex.test(c));
+                    if (ugyldige.length > 0) {
                         statusHTML = `<span class="fail">FEIL FORMAT</span>`;
-                        infoHTML = `Må være 8 siffer. Feil funnet: ${ugyldigeKoder.join(", ")}`;
+                        infoHTML = `Må være 8 siffer. Feil: ${ugyldige.join(", ")}`;
                         isError = true;
                     } else { statusHTML = `<span class="pass">OK</span>`; infoHTML = `Koder: ${verdier.join(", ")}`; }
-                }
-                else if (k === "PNS") {
-                    const ugyldigePNS = verdier.filter(v => !pnsRegex.test(v));
-                    if (ugyldigePNS.length > 0) {
+                } else if (k === "PNS") {
+                    const ugyldige = verdier.filter(v => !pnsRegex.test(v));
+                    if (ugyldige.length > 0) {
                         statusHTML = `<span class="fail">UGYLDIG KODE</span>`;
-                        infoHTML = `Må inneholde DSS, FBX, GTS, HTØ, VLG, FEL eller DNS. Funnet: ${ugyldigePNS.join(", ")}`;
+                        infoHTML = `Må inneholde DSS, FBX, GTS, HTØ, VLG, FEL eller DNS. Funnet: ${ugyldige.join(", ")}`;
                         isError = true;
-                    } else { statusHTML = `<span class="pass">OK</span>`; infoHTML = `Funnet: ${verdier.join(", ")}`; }
-                }
-                else {
+                    } else { statusHTML = `<span class="pass">OK</span>`; infoHTML = `Verdier: ${verdier.join(", ")}`; }
+                } else {
                     statusHTML = `<span class="pass">OK</span>`;
                     infoHTML = `Verdi: ${verdier.join(", ")}`;
                 }
             }
-
             if (isError) feilAntall++;
-            
-            body.innerHTML += `
-                <tr>
-                    <td>
-                        <img src="https://p7.hiclipart.com/preview/1009/635/820/industry-foundation-classes-building-information-modeling-buildingsmart-navisworks-bim.jpg" class="ifc-icon">
-                        <b>${k}</b>
-                    </td>
-                    <td>${statusHTML}</td>
-                    <td><small>${infoHTML}</small></td>
-                </tr>`;
+            body.innerHTML += `<tr><td><img src="https://p7.hiclipart.com/preview/1009/635/820/industry-foundation-classes-building-information-modeling-buildingsmart-navisworks-bim.jpg" class="ifc-icon"><b>${k}</b></td><td>${statusHTML}</td><td><small>${infoHTML}</small></td></tr>`;
         });
 
         summary.className = feilAntall === 0 ? "summary-box summary-pass" : "summary-box summary-fail";
-        summary.innerHTML = feilAntall === 0 
-            ? `✅ Modellen "${filename}" er kontrollert og godkjent.` 
-            : `❌ Modellen "${filename}" har ${feilAntall} avvik.`;
-
+        summary.innerHTML = feilAntall === 0 ? `✅ Modellen "${filename}" er godkjent.` : `❌ Modellen "${filename}" har ${feilAntall} avvik.`;
         title.innerHTML = feilAntall === 0 ? "Godkjent for leveranse" : "Avvik funnet i metadata";
         resultCard.style.display = 'block';
     }
